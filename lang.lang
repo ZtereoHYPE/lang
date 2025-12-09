@@ -1,0 +1,20 @@
+fn main(): Unit = {
+    let variable: I64 = 123 + !3 * 4 / {3 + 4};
+    {
+        let hello: Unit = {
+            ()
+        };
+        
+        ()
+    }
+}
+
+fn funnyName(x: I64): I64 = x + 13
+
+fn tester(): Unit = {
+    let x: Bool = false;
+
+    !funnyName(123);
+
+    -main()
+}

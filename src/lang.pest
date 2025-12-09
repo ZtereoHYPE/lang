@@ -1,0 +1,37 @@
+// Good grammar inspiration source: https://doc.rust-lang.org/reference/items/functions.html
+
+// Whitespace and Comment
+// Silent (_) means they dont appear in the output
+WHITESPACE = _{ " " | NEWLINE }
+COMMENT    = _{ "//" ~ (!"\n" ~ ANY)* } // do NOT consume the newline at the end
+
+// Primitives
+// Atomic (@) means no whitespace + interior rules are silent
+id      = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+ty      = @{ "I64" | "Bool" | "Unit" }
+typeDef = _{ ":" ~ ty }
+boolean = @{ "true" | "false" }
+integer = @{ ASCII_DIGIT+ }
+unit    = @{ "()" }
+
+program                 =  { SOI ~ function+ ~ &EOI }
+  function              =  { "fn" ~ id ~ "(" ~ params ~ ")" ~ typeDef ~ "=" ~ expression }
+    params              =  { param* }
+      param             =  { id ~ typeDef }
+    expression          =  { prefix? ~ atom ~ (infix ~ prefix? ~ atom)* } // inspired by: https://pest.rs/book/precedence.html
+      atom              = _{ ("(" ~ expression ~ ")") | block | literal | call | id | ifElse }
+        literal         = _{ boolean | integer | unit }
+        ifElse          =  { "if" ~ expression ~ block ~ ("else" ~ block)? }
+        call            =  { id ~ "(" ~ args ~ ")" }
+          args          = _{ (expression ~ ("," ~ expression)*)? }
+        block           =  { "{" ~ statement* ~ expression? ~ "}" }
+          statement     =  { (assignment | declaration | expression) ~ ";" }
+            assignment  =  { id ~ "=" ~ expression }
+            declaration =  { "let" ~ id ~ typeDef ~ "=" ~ expression }   
+      infix             = _{ addsub | muldiv | logic | compar }
+        logic           =  { "&" | "|" }
+        addsub          =  { "+" | "-" }
+        compar          =  { ">" | "<" | ">=" | "<=" | "==" | "!=" }
+        muldiv          =  { "*" | "/" }
+      prefix            = _{ negnot }
+        negnot          =  { "-" | "!" }

@@ -8,6 +8,7 @@ pub mod identifier;
 pub mod r#type;
 pub mod program;
 pub mod item;
+pub mod literal;
 
 pub use statement::*;
 pub use expression::*;

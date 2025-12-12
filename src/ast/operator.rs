@@ -1,5 +1,5 @@
 use pest::iterators::Pair;
-use crate::ast::{AstNode, AstParseError};
+use crate::ast::{AstNode, AstParseError, Type};
 use crate::Rule;
 
 #[derive(Debug, Clone)]
@@ -11,6 +11,7 @@ pub enum Operator {
     Negated,
     And,
     Or,
+    Xor,
     Not,
     GreaterThan,
     GreaterOrEqualThan,
@@ -18,6 +19,46 @@ pub enum Operator {
     LessOrEqualThan,
     Equal,
     Different
+}
+
+impl Operator {
+    fn arg_type(&self) -> Type { match self {
+        Operator::Plus |
+        Operator::Minus |
+        Operator::Times |
+        Operator::Divided |
+        Operator::Negated |
+        Operator::GreaterThan |
+        Operator::GreaterOrEqualThan |
+        Operator::LessThan |
+        Operator::LessOrEqualThan |
+        Operator::Equal |
+        Operator::Different => Type::I64,
+
+        Operator::And |
+        Operator::Or |
+        Operator::Xor |
+        Operator::Not => Type::Bool
+    }}
+
+    fn ret_type(&self) -> Type { match self {
+        Operator::Plus |
+        Operator::Minus |
+        Operator::Times |
+        Operator::Divided |
+        Operator::Negated => Type::I64,
+
+        Operator::And |
+        Operator::Or |
+        Operator::Not |
+        Operator::Xor |
+        Operator::GreaterThan |
+        Operator::GreaterOrEqualThan |
+        Operator::LessThan |
+        Operator::LessOrEqualThan |
+        Operator::Equal |
+        Operator::Different => Type::Bool
+    }}
 }
 
 impl AstNode for Operator {

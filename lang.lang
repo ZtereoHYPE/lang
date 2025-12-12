@@ -14,6 +14,12 @@ fn funnyName(x: I64): I64 = x + 13
 fn tester(): Unit = {
     let x: Bool = false;
 
+    let y: I64 = if x {
+        10
+    } else {
+        -10
+    };
+
     !funnyName(123);
 
     -main()

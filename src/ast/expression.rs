@@ -2,6 +2,7 @@ use pest::iterators::{Pair, Pairs};
 use pest::pratt_parser::{Assoc, PrattParser, PrattParserMap};
 use crate::ast::{nth_inner, nth_inner_opt, AstNode, AstParseError};
 use crate::ast::identifier::Identifier;
+use crate::ast::literal::Literal;
 use crate::ast::operator::Operator;
 use crate::ast::r#type::Type;
 use crate::ast::statement::Statement;
@@ -38,10 +39,7 @@ pub enum Expression {
     Variable {
         id: Identifier
     },
-    Literal {
-        ty: Type,
-        value: String
-    },
+    Literal(Literal),
     If {
         expression: Box<Expression>,
         then: Box<Expression>,
@@ -73,9 +71,7 @@ impl Expression {
 }
 
 fn map_primary(primary: Pair<Rule>) -> Result<Expression, AstParseError> {match primary.as_rule() {
-    Rule::boolean    => Ok(Expression::Literal { ty: Type::Bool, value: String::from(primary.as_str()) }),
-    Rule::integer    => Ok(Expression::Literal { ty: Type::I64,  value: String::from(primary.as_str()) }),
-    Rule::unit       => Ok(Expression::Literal { ty: Type::Unit, value: String::from(primary.as_str()) }),
+    Rule::literal    => Ok(Expression::Literal(Literal::from_pair(primary)?)),
     Rule::id         => Ok(Expression::Variable { id: Identifier::from_pair(primary)? }),
     Rule::expression => Expression::from_pairs(primary.into_inner()),
 

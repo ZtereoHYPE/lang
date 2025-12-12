@@ -19,8 +19,8 @@ program                 =  { SOI ~ function+ ~ &EOI }
     params              =  { param* }
       param             =  { id ~ typeDef }
     expression          =  { prefix? ~ atom ~ (infix ~ prefix? ~ atom)* } // inspired by: https://pest.rs/book/precedence.html
-      atom              = _{ ("(" ~ expression ~ ")") | block | literal | call | id | ifElse }
-        literal         = _{ boolean | integer | unit }
+      atom              = _{ ("(" ~ expression ~ ")") | block | literal | ifElse | call | id }
+        literal         =  { boolean | integer | unit }
         ifElse          =  { "if" ~ expression ~ block ~ ("else" ~ block)? }
         call            =  { id ~ "(" ~ args ~ ")" }
           args          = _{ (expression ~ ("," ~ expression)*)? }
@@ -29,7 +29,7 @@ program                 =  { SOI ~ function+ ~ &EOI }
             assignment  =  { id ~ "=" ~ expression }
             declaration =  { "let" ~ id ~ typeDef ~ "=" ~ expression }   
       infix             = _{ addsub | muldiv | logic | compar }
-        logic           =  { "&" | "|" }
+        logic           =  { "&" | "|" | "^"}
         addsub          =  { "+" | "-" }
         compar          =  { ">" | "<" | ">=" | "<=" | "==" | "!=" }
         muldiv          =  { "*" | "/" }

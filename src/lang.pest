@@ -29,7 +29,7 @@ program                 =  { SOI ~ function+ ~ &EOI }
             assignment  =  { id ~ "=" ~ expression }
             declaration =  { "let" ~ id ~ typeDef ~ "=" ~ expression }   
       infix             = _{ addsub | muldiv | logic | compar }
-        logic           =  { "&" | "|" | "^"}
+        logic           =  { "&" | "|" | "^" }
         addsub          =  { "+" | "-" }
         compar          =  { ">" | "<" | ">=" | "<=" | "==" | "!=" }
         muldiv          =  { "*" | "/" }

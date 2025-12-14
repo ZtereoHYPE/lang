@@ -1,5 +1,25 @@
+use std::collections::HashMap;
+
+pub type SymbolTable = HashMap<Identifier, Symbol>;
+
+#[derive(Debug, Clone)]
+pub enum Symbol {
+    Variable {
+        ty: Type
+    },
+
+    Function {
+        ty: Type,
+        params: Vec<Type>
+    },
+
+    Unknown // needs further analysis to be determined
+}
+
+
 #[derive(Debug, Clone)]
 pub struct Program {
+    pub symbols: SymbolTable, // for the functions
     pub items: Vec<Item>
 }
 
@@ -7,6 +27,7 @@ pub struct Program {
 pub enum Item {
     Function {
         id: Identifier,
+        symbols: SymbolTable, // for the function parameters
         params: Vec<(Identifier, Type)>,
         ty: Type,
         body: Expression
@@ -18,7 +39,7 @@ pub struct Identifier {
     pub(crate) id: String
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Type {
     I64,
     Bool,
@@ -28,7 +49,7 @@ pub enum Type {
 #[derive(Debug, Clone)]
 pub enum Expression {
     UnaryOp {
-        op: Operator, // string or actual value here?
+        op: Operator, 
         expr: Box<Expression>
     },
     BinaryOp {
@@ -50,6 +71,7 @@ pub enum Expression {
         else_expr: Option<Box<Expression>>
     },
     Block {
+        symbols: SymbolTable,   // for the declarations
         statements: Vec<Statement>,
         expression: Option<Box<Expression>>
     }
@@ -98,7 +120,7 @@ pub enum Statement {
 
 
 impl Literal {
-    fn ty(&self) -> Type {
+    pub fn ty(&self) -> Type {
         match self {
             Literal::Bool(_) => Type::Bool,
             Literal::I64(_) => Type::I64,
@@ -108,7 +130,7 @@ impl Literal {
 }
 
 impl Operator {
-    fn arg_type(&self) -> Type { match self {
+    pub fn arg_type(&self) -> Type { match self {
         Operator::Plus |
         Operator::Minus |
         Operator::Times |
@@ -127,7 +149,7 @@ impl Operator {
         Operator::Not => Type::Bool
     }}
 
-    fn ret_type(&self) -> Type { match self {
+    pub fn ret_type(&self) -> Type { match self {
         Operator::Plus |
         Operator::Minus |
         Operator::Times |

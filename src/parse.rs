@@ -1,11 +1,12 @@
-use std::process::exit;
+use crate::ast::{Expression, Identifier, Item, Literal, Operator, Program, Statement, Type};
 use itertools::Itertools;
 use pest::error::{ErrorVariant, LineColLocation};
 use pest::iterators::{Pair, Pairs};
-use pest::Parser;
 use pest::pratt_parser::{Assoc, PrattParser, PrattParserMap};
+use pest::Parser;
 use pest_derive::Parser;
-use crate::ast::{Expression, Identifier, Item, Literal, Operator, Program, Statement, Type};
+use std::collections::HashMap;
+use std::process::exit;
 
 #[derive(Parser)]
 #[grammar = "lang.pest"]
@@ -79,12 +80,14 @@ pub trait FromParseTree : Sized {
 impl FromParseTree for Program {
     fn from_pair(pair: Pair<Rule>) -> Result<Self, AstParseError> {
         let pair = check_pair(pair, Rule::program)?;
+        let symbols = HashMap::new();
 
         Ok(Self {
             items: pair
                 .into_inner()
                 .map(|i| Item::from_pair(i))
-                .process_results(|r| r.collect())? // stop at the first Err
+                .process_results(|r| r.collect())?, // stop at the first Err
+            symbols
         })
     }
 }
@@ -105,7 +108,9 @@ impl FromParseTree for Item {
             params.push((id, ty))
         }
 
-        Ok(Item::Function { id, params, ty, body })
+        let symbols = HashMap::new();
+
+        Ok(Item::Function { id, params, ty, body, symbols })
     }
 }
 
@@ -161,7 +166,9 @@ impl Expression {
                 }
             }
 
-            Ok(Expression::Block { statements, expression })
+            let symbols = HashMap::new();
+
+            Ok(Expression::Block { statements, expression, symbols })
         },
 
         Rule::ifElse => {

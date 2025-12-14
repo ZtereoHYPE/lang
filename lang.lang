@@ -5,6 +5,8 @@ fn main(): Unit = {
             ()
         };
         
+        funnyName(-12);
+        
         ()
     }
 }

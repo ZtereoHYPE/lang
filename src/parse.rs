@@ -150,7 +150,7 @@ impl Expression {
     }
 
     fn map_primary(primary: Pair<Rule>) -> Result<Expression, AstParseError> {match primary.as_rule() {
-        Rule::literal    => Ok(Expression::Literal(Literal::from_pair(primary)?)),
+        Rule::literal    => Ok(Expression::Literal(Literal::from_pair(primary.into_inner().next().unwrap())?)),
         Rule::id         => Ok(Expression::Variable { id: Identifier::from_pair(primary)? }),
         Rule::expression => Expression::from_pairs(primary.into_inner()),
 
@@ -249,7 +249,7 @@ impl FromParseTree for Literal {
             Rule::boolean => Ok(Literal::Bool(pair.as_str().parse().map_err(|_| AstParseError::new_str("Failed to parse boolean!"))?)),
             Rule::integer => Ok(Literal::I64(pair.as_str().parse().map_err(|_| AstParseError::new_str("Failed to parse integer!"))?)),
             Rule::unit    => Ok(Literal::Unit()),
-            _ => Err(AstParseError::new_str("Bad literal type encountered."))
+            _ => Err(AstParseError::new(format!("Bad literal type encountered: {:?}", pair.as_rule())))
         }
     }
 }

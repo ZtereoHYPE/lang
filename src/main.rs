@@ -1,5 +1,6 @@
 use crate::parse::parse_file;
 use crate::resolve_symbols::resolve_symbols;
+use crate::resolve_types::resolve_types;
 use std::fs;
 
 mod ast;
@@ -13,6 +14,7 @@ fn main() {
 
     let mut ast = parse_file(input_file);
     resolve_symbols(&mut ast);
+    resolve_types(&mut ast);
 
     println!("{:?}", ast);
 }

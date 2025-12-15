@@ -5,7 +5,7 @@ use itertools::Itertools;
 
 #[derive(Clone)]
 pub struct ScopeStack<'a> {
-    stack: Vec<&'a SymbolTable>
+    pub(crate) stack: Vec<&'a SymbolTable>
 }
 
 impl<'a> ScopeStack<'a> {

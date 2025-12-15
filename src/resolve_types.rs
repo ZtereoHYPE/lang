@@ -63,7 +63,7 @@ impl Expression {
             let rhs_ty = rhs.resolve_type(stack)?;
 
             if lhs_ty != rhs_ty {
-                Err(TypeError {string: format!("Operator {:?} expected lhs and rhs of same time but received '{:?}' and '{:?}'.", op.arg_type(), lhs_ty, rhs_ty)})
+                Err(TypeError {string: format!("Operator {:?} expected lhs and rhs of same time but received '{:?}' and '{:?}'.", op, lhs_ty, rhs_ty)})
 
             } else if op.arg_type() != lhs_ty {
                 Err(TypeError {string: format!("Operator {:?} expected expression of type '{:?}' but received type '{:?}'.", op,op.arg_type(), lhs_ty)})
@@ -130,6 +130,22 @@ impl Expression {
                     Ok(then_ty)
                 }
             }
+        },
+
+        Expression::While { expression, block } => {
+            // Enforce boolean expression
+            let expr_ty = expression.resolve_type(stack.clone())?;
+            if expr_ty != Type::Bool {
+                return Err(TypeError {string: format!("While loop expected expression of type Bool, but got '{:?}'", expr_ty)})
+            }
+
+            // Enforce Unit body
+            let block_ty = block.resolve_type(stack.clone())?;
+            if block_ty != Type::Unit {
+                return Err(TypeError {string: format!("While loop expected body of type Unit, but got '{:?}'", block_ty)})
+            }
+
+            Ok(Type::Unit)
         },
 
         Expression::Block { symbols, statements, expression } => {

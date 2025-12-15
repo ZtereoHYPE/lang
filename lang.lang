@@ -1,28 +1,33 @@
-fn main(): Unit = {
-    let variable: I64 = 123 + -3 * 4 / {3 + 4};
-    {
-        let hello: Unit = {
-            ()
-        };
-        
-        funnyName(-12);
-        
-        ()
-    }
-}
-
-fn funnyName(x: I64): I64 = x + 13
+fn funnyName(x: Int): Int = x + 13
 
 fn tester(): Unit = {
     let x: Bool = false;
 
-    let y: I64 = if x {
+    let y: Int = if x {
         10
     } else {
         -10
     };
 
+    while 10 > 3 {
+        // block mandatory
+        1;
+    };
+
     -funnyName(123);
 
-    main()
+    // main()
+}
+
+fn main(): Unit = {
+    let variable: Int = 123 + -3 * 4 / {3 + 4};
+    {
+        let hello: Unit = {
+            ()
+        };
+
+        funnyName(-12);
+
+        ()
+    }
 }

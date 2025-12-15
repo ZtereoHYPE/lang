@@ -8,7 +8,7 @@ COMMENT    = _{ "//" ~ (!"\n" ~ ANY)* } // do NOT consume the newline at the end
 // Primitives
 // Atomic (@) means no whitespace + interior rules are silent
 id      = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
-ty      = @{ "I64" | "Bool" | "Unit" }
+ty      = @{ "Int" | "Bool" | "Unit" }
 typeDef = _{ ":" ~ ty }
 boolean = @{ "true" | "false" }
 integer = @{ ASCII_DIGIT+ }
@@ -19,15 +19,16 @@ program                 =  { SOI ~ function+ ~ &EOI }
     params              =  { param* }
       param             =  { id ~ typeDef }
     expression          =  { prefix? ~ atom ~ (infix ~ prefix? ~ atom)* } // inspired by: https://pest.rs/book/precedence.html
-      atom              = _{ ("(" ~ expression ~ ")") | block | literal | ifElse | call | id }
+      atom              = _{ ("(" ~ expression ~ ")") | ifElse | whileLoop | block | literal | call | id }
         literal         =  { boolean | integer | unit }
         ifElse          =  { "if" ~ expression ~ block ~ ("else" ~ block)? }
+        whileLoop       =  { "while" ~ expression ~ block }
         call            =  { id ~ "(" ~ args ~ ")" }
           args          = _{ (expression ~ ("," ~ expression)*)? }
         block           =  { "{" ~ statement* ~ expression? ~ "}" }
           statement     =  { (assignment | declaration | expression) ~ ";" }
             assignment  =  { id ~ "=" ~ expression }
-            declaration =  { "let" ~ id ~ typeDef ~ "=" ~ expression }   
+            declaration =  { "let" ~ id ~ typeDef ~ "=" ~ expression }
       infix             = _{ addsub | muldiv | logic | compar }
         logic           =  { "&" | "|" | "^" }
         addsub          =  { "+" | "-" }

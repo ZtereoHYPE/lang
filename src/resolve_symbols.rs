@@ -118,6 +118,11 @@ impl PopulateSymbols for Expression {
                 then.populate_symbols(stack);
             }
 
+            Expression::While { expression, block } => {
+                expression.populate_symbols(stack.clone());
+                block.populate_symbols(stack);
+            },
+
             Expression::Block { symbols, statements, expression } => {
                 for statement in statements {
                     match statement {

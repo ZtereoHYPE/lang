@@ -127,7 +127,7 @@ impl FromParseTree for Type {
         let pair = check_pair(pair, Rule::ty)?;
         let str = pair.as_str();
 
-        Ok(if str == "I64" {Self::I64} else if str == "Bool" {Self::Bool} else {Self::Unit})
+        Ok(if str == "Int" {Self::Int} else if str == "Bool" {Self::Bool} else {Self::Unit})
     }
 }
 
@@ -183,6 +183,13 @@ impl Expression {
                 };
 
             Ok(Expression::If { expression, then, else_expr })
+        },
+        
+        Rule::whileLoop => {
+            let expression = Box::new(Expression::from_pair(nth_inner(&primary, 0))?);
+            let block =      Box::new(Expression::from_pair(nth_inner(&primary, 1))?);
+
+            Ok(Expression::While { expression, block })
         },
 
         Rule::call => {
@@ -247,7 +254,7 @@ impl FromParseTree for Literal {
     fn from_pair(pair: Pair<Rule>) -> Result<Self, AstParseError> {
         match pair.as_rule() {
             Rule::boolean => Ok(Literal::Bool(pair.as_str().parse().map_err(|_| AstParseError::new_str("Failed to parse boolean!"))?)),
-            Rule::integer => Ok(Literal::I64(pair.as_str().parse().map_err(|_| AstParseError::new_str("Failed to parse integer!"))?)),
+            Rule::integer => Ok(Literal::Int(pair.as_str().parse().map_err(|_| AstParseError::new_str("Failed to parse integer!"))?)),
             Rule::unit    => Ok(Literal::Unit()),
             _ => Err(AstParseError::new(format!("Bad literal type encountered: {:?}", pair.as_rule())))
         }

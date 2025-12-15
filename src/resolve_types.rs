@@ -3,7 +3,11 @@ use crate::ast::{Expression, Item, Program, Statement, Symbol, Type};
 use crate::resolve_symbols::ScopeStack;
 
 struct TypeError {
-    string: String
+    error: String
+}
+
+impl TypeError {
+    fn new(error: String) -> Self {Self {error}}
 }
 
 pub fn resolve_types(program: &mut Program) {
@@ -12,7 +16,7 @@ pub fn resolve_types(program: &mut Program) {
     };
 
     if let Err(e) = program.resolve_types(stack) {
-        println!("Type error detected: {}", e.string)
+        println!("Type error detected: {}", e.error)
     }
 }
 
@@ -52,7 +56,7 @@ impl Expression {
         Expression::UnaryOp { op, expr } => {
             let expr_ty = expr.resolve_type(stack)?;
             if op.arg_type() != expr_ty {
-                Err(TypeError {string: format!("Operator {:?} expected expression of type '{:?}' but received type '{:?}'.", op,op.arg_type(), expr_ty)})
+                Err(TypeError::new(format!("Operator {:?} expected expression of type '{:?}' but received type '{:?}'.", op,op.arg_type(), expr_ty)))
             } else {
                 Ok(op.ret_type())
             }
@@ -63,10 +67,10 @@ impl Expression {
             let rhs_ty = rhs.resolve_type(stack)?;
 
             if lhs_ty != rhs_ty {
-                Err(TypeError {string: format!("Operator {:?} expected lhs and rhs of same time but received '{:?}' and '{:?}'.", op, lhs_ty, rhs_ty)})
+                Err(TypeError::new(format!("Operator {:?} expected lhs and rhs of same time but received '{:?}' and '{:?}'.", op, lhs_ty, rhs_ty)))
 
             } else if op.arg_type() != lhs_ty {
-                Err(TypeError {string: format!("Operator {:?} expected expression of type '{:?}' but received type '{:?}'.", op,op.arg_type(), lhs_ty)})
+                Err(TypeError::new(format!("Operator {:?} expected expression of type '{:?}' but received type '{:?}'.", op,op.arg_type(), lhs_ty)))
 
             } else {
                 Ok(op.ret_type())
@@ -79,19 +83,19 @@ impl Expression {
             if let Some(Symbol::Function { ty, params }) = stack.resolve_symbol(id) {
                 // Check for the right amount of arguments
                 if params.len() != args.len() {
-                    return Err(TypeError {string: format!("Wrong number of arguments in function '{}'", id.id)});
+                    return Err(TypeError::new(format!("Wrong number of arguments in function '{}'", id.id)));
                 }
 
                 // check that the types of the arguments match the parameters
                 for (arg, par) in args.iter_mut().zip(params) {
                     if arg.resolve_type(stack.clone())? != par {
-                        return Err(TypeError {string: "Function argument of wrong type".to_string()});
+                        return Err(TypeError::new("Function argument of wrong type".to_string()));
                     }
                 }
 
                 Ok(ty)
             } else {
-                Err(TypeError {string: format!("Failed to find function with name '{}'", id.id)})
+                Err(TypeError::new(format!("Failed to find function with name '{}'", id.id)))
             }
         },
 
@@ -99,7 +103,7 @@ impl Expression {
             if let Some(Symbol::Variable {ty}) = stack.resolve_symbol(id) {
                 Ok(ty)
             } else {
-                Err(TypeError {string: format!("Failed to find variable with name '{}'", id.id)})
+                Err(TypeError::new(format!("Failed to find variable with name '{}'", id.id)))
             }
         },
 
@@ -109,7 +113,7 @@ impl Expression {
             // Enforce boolean expression
             let expr_ty = expression.resolve_type(stack.clone())?;
             if expr_ty != Type::Bool {
-                return Err(TypeError {string: format!("If statement expected boolean expression, but got '{:?}'", expr_ty)})
+                return Err(TypeError::new(format!("If statement expected boolean expression, but got '{:?}'", expr_ty)))
             }
 
             // todo: clean this logic up a little (use a match on the tuple!)
@@ -118,17 +122,17 @@ impl Expression {
                 // If there's an else branch, it should match the type of then
                 let else_ty = e.resolve_type(stack)?;
                 if then_ty != else_ty {
-                    Err(TypeError {string: format!("Two branches of if statement should return the same type, but got '{:?}' and '{:?}'", then_ty, else_ty)})
-                } else {
-                    Ok(then_ty)
+                    return Err(TypeError::new(format!("Two branches of if statement should return the same type, but got '{:?}' and '{:?}'", then_ty, else_ty)))
                 }
+
+                Ok(then_ty)
             } else {
                 // Else, the then should return ()
                 if then_ty != Type::Unit {
-                    Err(TypeError {string: format!("Single branch if statement should return '()', but got '{:?}'", then_ty)})
-                } else {
-                    Ok(then_ty)
+                    return Err(TypeError::new(format!("Single branch if statement should return '()', but got '{:?}'", then_ty)))
                 }
+
+                Ok(then_ty)
             }
         },
 
@@ -136,13 +140,13 @@ impl Expression {
             // Enforce boolean expression
             let expr_ty = expression.resolve_type(stack.clone())?;
             if expr_ty != Type::Bool {
-                return Err(TypeError {string: format!("While loop expected expression of type Bool, but got '{:?}'", expr_ty)})
+                return Err(TypeError::new(format!("While loop expected expression of type Bool, but got '{:?}'", expr_ty)))
             }
 
             // Enforce Unit body
             let block_ty = block.resolve_type(stack.clone())?;
             if block_ty != Type::Unit {
-                return Err(TypeError {string: format!("While loop expected body of type Unit, but got '{:?}'", block_ty)})
+                return Err(TypeError::new(format!("While loop expected body of type Unit, but got '{:?}'", block_ty)))
             }
 
             Ok(Type::Unit)
@@ -158,10 +162,10 @@ impl Expression {
 
                         if let Some(Symbol::Variable {ty}) = stack.with_scope(symbols).resolve_symbol(id) {
                             if ty != expr_ty {
-                                return Err(TypeError {string: format!("Assigned variable type doesn't match expression type. Expected '{:?}', got '{:?}'", ty, expr_ty)})
+                                return Err(TypeError::new(format!("Assigned variable type doesn't match expression type. Expected '{:?}', got '{:?}'", ty, expr_ty)))
                             }
                         } else {
-                            return Err(TypeError {string: format!("Expected variable for '{}', but found function", id.id)})
+                            return Err(TypeError::new(format!("Expected variable for '{}', but found function", id.id)))
                         }
                     }
 
@@ -171,7 +175,7 @@ impl Expression {
                         let expr_ty = expression.resolve_type(stack.with_scope(symbols))?;
 
                         if *ty != expr_ty {
-                            return Err(TypeError {string: format!("Expected expression of type {:?}, but got {:?}", ty, expr_ty)})
+                            return Err(TypeError::new(format!("Expected expression of type {:?}, but got {:?}", ty, expr_ty)))
                         }
 
                         symbols.insert(id.clone(), Symbol::Variable {ty: *ty});
@@ -185,10 +189,10 @@ impl Expression {
             }
 
             if let Some(expr) = expression {
-                expr.resolve_type(stack.with_scope(symbols))
-            } else {
-                Ok(Type::Unit)
+                return expr.resolve_type(stack.with_scope(symbols))
             }
+
+            Ok(Type::Unit)
         },
     }}
 }

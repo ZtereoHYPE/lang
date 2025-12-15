@@ -1,5 +1,5 @@
 fn main(): Unit = {
-    let variable: I64 = 123 + !3 * 4 / {3 + 4};
+    let variable: I64 = 123 + -3 * 4 / {3 + 4};
     {
         let hello: Unit = {
             ()
@@ -22,7 +22,7 @@ fn tester(): Unit = {
         -10
     };
 
-    !funnyName(123);
+    -funnyName(123);
 
-    -main()
+    main()
 }

@@ -1,4 +1,4 @@
-use crate::ast::{Expression, Identifier, Item, Literal, Operator, Program, Statement, Type};
+use crate::states::ast::{Expression, Identifier, Item, Literal, Operator, Program, Statement, Type};
 use itertools::Itertools;
 use pest::error::{ErrorVariant, LineColLocation};
 use pest::iterators::{Pair, Pairs};
@@ -138,7 +138,7 @@ impl FromParseTree for Expression {
 }
 
 impl Expression {
-    fn get_pratt_parser<'pratt, 'a, 'i>() -> (PrattParserMap<'pratt, 'a, 'i, Rule, fn(Pair<'i, Rule>) -> Result<Expression, AstParseError>, Result<Expression, AstParseError>>) {
+    fn get_pratt_parser<'pratt, 'a, 'i>() -> PrattParserMap<'pratt, 'a, 'i, Rule, fn(Pair<'i, Rule>) -> Result<Expression, AstParseError>, Result<Expression, AstParseError>> {
         PRATT_PARSER
             .map_primary(Self::map_primary as fn(_) -> _) // why cant it figure out it's a function on its own
             .map_infix(Self::map_infix)
@@ -161,7 +161,7 @@ impl Expression {
             for inner in primary.into_inner() {
                 match inner.as_rule() {
                     Rule::statement => statements.push(Statement::from_pair(inner)?),
-                    Rule::expression => expression = Option::Some(Box::new(Expression::from_pair(inner)?)),
+                    Rule::expression => expression = Some(Box::new(Expression::from_pair(inner)?)),
                     _ => unreachable!("Grammar guarantees that blocks only contain statements or expressions.")
                 }
             }

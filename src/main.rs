@@ -1,13 +1,10 @@
-use crate::parse::parse_file;
-use crate::resolve_symbols::resolve_symbols;
-use crate::resolve_types::resolve_types;
+use crate::passes::parse::parse_file;
+use crate::passes::resolve_symbols::resolve_symbols;
+use crate::passes::resolve_types::resolve_types;
 use std::fs;
 
-mod ast;
-mod resolve_symbols;
-mod ir;
-mod parse;
-mod resolve_types;
+mod states;
+mod passes;
 
 fn main() {
     let input_file = fs::read_to_string("lang.lang").expect("cannot read file");
@@ -16,5 +13,5 @@ fn main() {
     resolve_symbols(&mut ast);
     resolve_types(&mut ast);
 
-    println!("{:?}", ast);
+    // println!("{:?}", ast);
 }

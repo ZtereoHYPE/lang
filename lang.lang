@@ -16,18 +16,19 @@ fn tester(): Unit = {
 
     -funnyName(123);
 
-    // main()
+    main()
 }
 
 fn main(): Unit = {
     let variable: Int = 123 + -3 * 4 / {3 + 4};
-    {
-        let hello: Unit = {
-            ()
-        };
+
+    let myThing: Int = {
+        let hello: Unit = {};
 
         funnyName(-12);
 
-        ()
-    }
+        let x: Int = 12;
+
+        variable + 13
+    };
 }

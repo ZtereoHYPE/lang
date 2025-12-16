@@ -1,28 +1,7 @@
+use crate::states::ast::Item::Function;
+use crate::states::ast::{Expression, Item, Program, Statement, Symbol};
+use crate::states::scope::ScopeStack;
 use std::process::exit;
-use crate::ast::Item::Function;
-use crate::ast::{Expression, Identifier, Item, Program, Statement, Symbol, SymbolTable};
-
-
-#[derive(Clone)]
-pub struct ScopeStack<'a> {
-    pub(crate) stack: Vec<&'a SymbolTable>
-}
-
-impl<'a> ScopeStack<'a> {
-    pub(crate) fn with_scope(&self, scope: &'a SymbolTable) -> Self {
-        let mut stack = self.stack.clone();
-        stack.push(scope);
-        Self { stack }
-    }
-
-    pub(crate) fn resolve_symbol(&self, id: &Identifier) -> Option<Symbol> {
-        // Find the topmost scope that contains the symbol, and map it to an Option<SymbolInfo> (cloned to avoid reference)
-        self.stack
-            .iter()
-            .rev()
-            .find_map(|s| s.get(id).cloned())
-    }
-}
 
 struct SymbolError {
     error: String

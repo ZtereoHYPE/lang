@@ -1,6 +1,6 @@
-use crate::ast::Item::Function;
-use crate::ast::{Expression, Item, Program, Statement, Symbol, Type};
-use crate::resolve_symbols::ScopeStack;
+use crate::states::ast::Item::Function;
+use crate::states::ast::{Expression, Item, Program, Statement, Symbol, Type};
+use crate::states::scope::ScopeStack;
 
 struct TypeError {
     error: String
@@ -116,7 +116,6 @@ impl Expression {
                 return Err(TypeError::new(format!("If statement expected boolean expression, but got '{:?}'", expr_ty)))
             }
 
-            // todo: clean this logic up a little (use a match on the tuple!)
             let then_ty = then.resolve_type(stack.clone())?;
             if let Some(e) = else_expr {
                 // If there's an else branch, it should match the type of then

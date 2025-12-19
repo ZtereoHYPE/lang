@@ -20,18 +20,16 @@ pub enum Symbol {
 #[derive(Debug, Clone)]
 pub struct Program {
     pub symbols: SymbolTable, // for the functions
-    pub items: Vec<Item>
+    pub functions: Vec<Function>
 }
 
 #[derive(Debug, Clone)]
-pub enum Item {
-    Function {
-        id: Identifier,
-        symbols: SymbolTable, // for the function parameters
-        params: Vec<(Identifier, Type)>,
-        ty: Type,
-        body: Expression
-    }
+pub struct Function {
+    pub id: Identifier,
+    pub symbols: SymbolTable, // for the function parameters
+    pub params: Vec<(Identifier, Type)>,
+    pub ty: Type,
+    pub body: Expression
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

@@ -62,7 +62,7 @@ impl Program {
 impl Function {
     fn populate_symbols(&mut self, stack: ScopeStack) -> Result<(), SymbolError> {
         // Add all parameters to the symbol list, as long as there's no collision
-        for (id, _) in self.params {
+        for (id, _) in &self.params {
             if self.symbols.contains_key(&id) {
                 return Err(SymbolError::new(format!("Function argument '{}' already exists!", id.id)))
             }

@@ -39,7 +39,7 @@ impl Program {
 impl Function {
     fn resolve_types(&mut self, stack: ScopeStack) -> Result<(), TypeError> {
         // Add all parameters to the symbol list, as long as there's no collision
-        for (id, ty) in self.params {
+        for (id, ty) in &self.params {
             self.symbols.insert(id.clone(), Symbol::Variable {ty: *ty});
         }
 

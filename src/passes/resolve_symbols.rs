@@ -1,5 +1,4 @@
-use crate::states::ast::Item::Function;
-use crate::states::ast::{Expression, Item, Program, Statement, Symbol};
+use crate::states::ast::{Expression, Function, Program, Statement, Symbol};
 use crate::states::scope::ScopeStack;
 use std::process::exit;
 
@@ -43,7 +42,7 @@ pub fn resolve_symbols(program: &mut Program) {
 impl Program {
     fn populate_symbols(&mut self, stack: ScopeStack) -> Result<(), SymbolError> {
         // Add all functions to the symbol list, as long as there's no collision
-        for Function {id, ..} in &self.items {
+        for Function {id, ..} in &self.functions {
             if self.symbols.contains_key(&id) {
                 return Err(SymbolError::new(format!("Function with id {} already exists!", id.id)))
             }
@@ -52,30 +51,28 @@ impl Program {
         }
 
         // Recursively populate the symbols down the tree, with the additional local scope
-        for item in &mut self.items {
-            item.populate_symbols(stack.with_scope(&self.symbols))?;
+        for function in &mut self.functions {
+            function.populate_symbols(stack.with_scope(&self.symbols))?;
         }
 
         Ok(())
     }
 }
 
-impl Item {
-    fn populate_symbols(&mut self, stack: ScopeStack) -> Result<(), SymbolError> { match self {
-        Function { symbols, params, body, .. } => {
-            // Add all parameters to the symbol list, as long as there's no collision
-            for (id, _) in params {
-                if symbols.contains_key(&id) {
-                    return Err(SymbolError::new(format!("Function argument '{}' already exists!", id.id)))
-                }
-
-                symbols.insert(id.clone(), Symbol::Unknown);
+impl Function {
+    fn populate_symbols(&mut self, stack: ScopeStack) -> Result<(), SymbolError> {
+        // Add all parameters to the symbol list, as long as there's no collision
+        for (id, _) in self.params {
+            if self.symbols.contains_key(&id) {
+                return Err(SymbolError::new(format!("Function argument '{}' already exists!", id.id)))
             }
 
-            // Recursively populate the symbols down the tree
-            body.populate_symbols(stack.with_scope(symbols))
+            self.symbols.insert(id.clone(), Symbol::Unknown);
         }
-    }}
+
+        // Recursively populate the symbols down the tree
+        self.body.populate_symbols(stack.with_scope(&self.symbols))
+    }
 }
 
 impl Expression {

@@ -1,19 +1,35 @@
 use crate::states::ast::{Identifier, Literal, Operator};
 
 pub struct Program {
-    blocks: Vec<Block>,
+    pub blocks: Vec<Function>,
 }
 
+pub struct Function {
+    pub name: Identifier,
+    pub params: Vec<Identifier>,
+    pub blocks: Vec<Block>
+}
 
 pub struct Block {
     pub name: String,
-    pub assignments: Vec<Assignment>,
-    pub terminal: Box<Terminal>
+    pub instructions: Vec<Instruction>,
 }
 
-pub struct Assignment {
-    pub var: Identifier,
-    pub expression: Expression
+pub enum Instruction {
+    Assignment {
+        var: Identifier,
+        expr: Expression,
+    },
+
+    Goto {
+        label: String,
+    },
+
+    Conditional {
+        condition: Atom,
+        then_label: String,
+        else_label: String
+    },
 }
 
 pub enum Expression {
@@ -26,7 +42,14 @@ pub enum Expression {
         lhs: Atom,
         op: Operator,
         rhs: Atom
-    }
+    },
+
+    FunCall {
+        id: Identifier,
+        args: Vec<Atom>
+    },
+
+    Atom(Atom)
 }
 
 pub enum Atom {
@@ -37,35 +60,8 @@ pub enum Atom {
     Value(Literal)
 }
 
-pub enum Terminal {
-    Return {
-        expression: Expression
-    },
-
-    Goto {
-        label: String,
-    },
-
-    Conditional {
-        condition: Expression,
-        if_branch: Box<Terminal>,
-        else_branch: Box<Terminal>
-    },
+impl Block {
+    pub fn from_label(name: String) -> Self {
+        Self { name, instructions: vec![] }
+    }
 }
-
-// enum Terminal {
-//     Return(Return),
-//     Goto(Goto),
-//     Conditional(Conditional),
-// }
-// struct Return {
-//     expression: Expression
-// }
-// struct Goto {
-//     label: String,
-// }
-// struct Conditional {
-//     condition: Expression,
-//     if_branch: Goto,
-//     else_branch: Goto
-// }

@@ -5,6 +5,7 @@ use std::fs;
 
 mod states;
 mod passes;
+pub mod naming;
 
 fn main() {
     let input_file = fs::read_to_string("lang.lang").expect("cannot read file");

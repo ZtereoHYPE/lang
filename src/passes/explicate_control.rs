@@ -1,12 +1,17 @@
 use crate::naming::Namer;
 use crate::states::{ast, ir};
 
+pub fn explicate_control(program: ast::Program) -> ir::Program {
+    let mut namer = Namer::new();
+    program.explicate_control(&mut namer)
+}
+
 impl ast::Program {
     fn explicate_control(self, namer: &mut Namer) -> ir::Program {
         ir::Program {
             blocks: self.functions
-                .iter()
-                .flat_map(|i| i.explicate_control(namer))
+                .into_iter()
+                .map(|i| i.explicate_control(namer))
                 .collect()
         }
     }
@@ -15,13 +20,12 @@ impl ast::Program {
 impl ast::Function {
     fn explicate_control(self, namer: &mut Namer) -> ir::Function {
         let mut blocks = vec![ir::Block::from_label(format!("{}_0", self.id.id))];
-        blocks.append(
-            &mut self.body.explicate_control(namer, blocks.last_mut().unwrap())
-        );
+        let mut new_blocks = self.body.explicate_control(namer, blocks.last_mut().unwrap());
+        blocks.append(&mut new_blocks);
 
         ir::Function {
             name: self.id,
-            params: self.params.iter().map(|(i, _)| i).collect(),
+            params: self.params.into_iter().map(|(i, _)| i).collect(),
             blocks,
         }
     }
@@ -49,9 +53,8 @@ impl ast::Expression {
             // Create the blocks for the true branch
             let mut then_blocks = {
                 let mut blocks = vec![ir::Block::from_label(then_label)];
-                blocks.append(
-                    &mut then.explicate_control(namer, blocks.last_mut().unwrap())
-                );
+                let mut new_blocks = then.explicate_control(namer, blocks.last_mut().unwrap());
+                blocks.append(&mut new_blocks);
 
                 blocks
                     .last_mut()
@@ -65,9 +68,8 @@ impl ast::Expression {
             // If there is a false branch, create its blocks
             let mut else_blocks = if let Some(e) = else_expr {
                 let mut blocks = vec![ir::Block::from_label(else_label)];
-                blocks.append(
-                    &mut e.explicate_control(namer, blocks.last_mut().unwrap())
-                );
+                let mut new_blocks = e.explicate_control(namer, blocks.last_mut().unwrap());
+                blocks.append(&mut new_blocks);
 
                 blocks
                     .last_mut()
@@ -103,7 +105,7 @@ impl ast::Expression {
             let loop_block = {
                 let branch = ir::Instruction::Conditional {
                     condition: expression.explicate_atom(),
-                    then_label: body_label,
+                    then_label: body_label.clone(),
                     else_label: after_label.clone(),
                 };
 
@@ -116,9 +118,8 @@ impl ast::Expression {
             // Create blocks for the body of the loop
             let mut body_blocks = {
                 let mut blocks = vec![ir::Block::from_label(body_label)];
-                blocks.append(
-                    &mut block.explicate_control(namer, blocks.last_mut().unwrap())
-                );
+                let mut new_blocks = block.explicate_control(namer, blocks.last_mut().unwrap());
+                blocks.append(&mut new_blocks);
 
                 blocks
                     .last_mut()
@@ -139,14 +140,19 @@ impl ast::Expression {
         // Expressions in blocks are only allowed as return values from functions.
         ast::Expression::Block { statements, expression, .. } => {
             // Expressions are forbidden, there is no return values?
-            if let Some(_) = expression {
+            if expression.is_some() {
                 panic!("No returns are allowed from blocks!")
             }
 
             // Fold the statements into a list of blocks
-            statements
-                .iter()
-                .fold(|(acc, s)| s.explicate_control(namer, acc.last_mut()), vec![]);
+            let mut blocks = vec![last_block.clone()];
+            for s in statements {
+                let mut new_blocks = s.explicate_control(namer, blocks.last_mut().unwrap());
+                blocks.append(&mut new_blocks)
+            }
+            blocks.remove(0);
+
+            blocks
         },
 
         // todo: discuss this
@@ -172,7 +178,7 @@ impl ast::Expression {
         ast::Expression::UnaryOp { op, expr } => ir::Expression::Unary { op, atom: expr.explicate_atom() },
         ast::Expression::BinaryOp { lhs, op, rhs } => ir::Expression::Binary { lhs: lhs.explicate_atom(), op, rhs: rhs.explicate_atom() },
         ast::Expression::FunctionCall { id, args } => {
-            let args = args.iter().map(|a| a.explicate_atom()).collect();
+            let args = args.into_iter().map(|a| a.explicate_atom()).collect();
             ir::Expression::FunCall { id, args }
         }
 
@@ -184,8 +190,8 @@ impl ast::Expression {
 impl ast::Statement {
     fn explicate_control(self, namer: &mut Namer, last_block: &mut ir::Block) -> Vec<ir::Block> { match self {
         // Assignments and declarations turn into assignment instructions
-        ast::Statement::Assignment { id, expression }
-        | ast::Statement::Declaration { id, expression, .. } => {
+        ast::Statement::Assignment { id, expression } |
+        ast::Statement::Declaration { id, expression, .. } => {
             let instr = ir::Instruction::Assignment { var: id, expr: expression.explicate_expression() };
             last_block.instructions.push(instr);
 

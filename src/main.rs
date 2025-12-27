@@ -1,3 +1,4 @@
+use crate::passes::explicate_control::explicate_control;
 use crate::passes::parse::parse_file;
 use crate::passes::resolve_symbols::resolve_symbols;
 use crate::passes::resolve_types::resolve_types;
@@ -14,5 +15,9 @@ fn main() {
     resolve_symbols(&mut ast);
     resolve_types(&mut ast);
 
-    // println!("{:?}", ast);
+    // ...
+
+    let ir = explicate_control(ast);
+
+    println!("{:?}", ir);
 }

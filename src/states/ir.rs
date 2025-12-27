@@ -1,20 +1,24 @@
 use crate::states::ast::{Identifier, Literal, Operator};
 
+#[derive(Clone, Debug)]
 pub struct Program {
     pub blocks: Vec<Function>,
 }
 
+#[derive(Clone, Debug)]
 pub struct Function {
     pub name: Identifier,
     pub params: Vec<Identifier>,
     pub blocks: Vec<Block>
 }
 
+#[derive(Clone, Debug)]
 pub struct Block {
     pub name: String,
     pub instructions: Vec<Instruction>,
 }
 
+#[derive(Clone, Debug)]
 pub enum Instruction {
     Assignment {
         var: Identifier,
@@ -32,6 +36,7 @@ pub enum Instruction {
     },
 }
 
+#[derive(Clone, Debug)]
 pub enum Expression {
     Unary {
         op: Operator,
@@ -52,6 +57,7 @@ pub enum Expression {
     Atom(Atom)
 }
 
+#[derive(Clone, Debug)]
 pub enum Atom {
     Variable {
         id: Identifier

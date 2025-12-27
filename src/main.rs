@@ -19,5 +19,9 @@ fn main() {
     shrink_program(&mut ast);
     uniquify_program(&mut ast);
 
-    println!("{:?}", ast);
+    // ...
+
+    let ir = explicate_control(ast);
+
+    println!("{:?}", ir);
 }

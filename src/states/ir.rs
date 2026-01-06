@@ -1,8 +1,9 @@
+use std::collections::HashSet;
 use crate::states::ast::{Identifier, Literal, Operator};
 
 #[derive(Clone, Debug)]
 pub struct Program {
-    pub blocks: Vec<Function>,
+    pub functions: Vec<Function>,
 }
 
 #[derive(Clone, Debug)]
@@ -15,16 +16,12 @@ pub struct Function {
 #[derive(Clone, Debug)]
 pub struct Block {
     pub name: String,
-    pub instructions: Vec<Instruction>,
+    pub assignments: Vec<(Identifier, Expression)>,
+    pub terminal: Terminal
 }
 
 #[derive(Clone, Debug)]
-pub enum Instruction {
-    Assignment {
-        var: Identifier,
-        expr: Expression,
-    },
-
+pub enum Terminal {
     Goto {
         label: String,
     },
@@ -34,6 +31,8 @@ pub enum Instruction {
         then_label: String,
         else_label: String
     },
+
+    Return(Expression)
 }
 
 #[derive(Clone, Debug)]
@@ -67,7 +66,14 @@ pub enum Atom {
 }
 
 impl Block {
-    pub fn from_label(name: String) -> Self {
-        Self { name, instructions: vec![] }
-    }
+    // for CFG navigation
+    pub fn children(&self) -> HashSet<&String> { match &self.terminal {
+        Terminal::Goto { label } => 
+            HashSet::from([label]),
+        
+        Terminal::Conditional { then_label, else_label, .. } => 
+            HashSet::from([then_label, else_label]),
+        
+        Terminal::Return(_) => HashSet::new()
+    }}
 }

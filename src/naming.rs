@@ -4,31 +4,27 @@ use std::collections::HashMap;
 use std::string::ToString;
 
 pub struct Namer {
+    current_fn_name: String,
     map: HashMap<String, u64>
 }
 
 impl Namer {
     pub fn new() -> Self {
-        Self { map: HashMap::new() }
+        Self { current_fn_name: "".to_string(), map: HashMap::new() }
     }
 
-    fn get_increment_value(&mut self, str: &str) -> u64 {
-        let value = *self.map.get(str).unwrap_or(&1u64);
-        self.map.insert(str.to_string(), value + 1);
-        value
+    pub fn set_fn_name(&mut self, name: String) {
+        self.current_fn_name = name;
     }
 
-    pub fn block_name(&mut self, block: &ir::Block, block_type: &str) -> String {
-        let fn_name = Self::get_fn_name(block).to_string();
-
+    pub fn block_name(&mut self, block_type: &str) -> String {
         let block_name = if block_type.is_empty() {
-            fn_name
+            self.current_fn_name.clone()
         } else {
-            format!("{}-{}", fn_name, block_type)
+            format!("{}-{}", self.current_fn_name, block_type)
         };
 
         let value = self.get_increment_value(&block_name);
-
         format!("{}-{}", block_name, value)
     }
 
@@ -37,7 +33,9 @@ impl Namer {
         Identifier { id: format!("_{}", value) }
     }
 
-    fn get_fn_name(block: &ir::Block) -> &str {
-        block.name.split("-").next().expect("Expected method")
+    fn get_increment_value(&mut self, str: &str) -> u64 {
+        let value = *self.map.get(str).unwrap_or(&1u64);
+        self.map.insert(str.to_string(), value + 1);
+        value
     }
 }

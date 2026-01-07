@@ -4,3 +4,4 @@ pub mod resolve_types;
 pub mod shrink;
 pub mod uniquify;
 pub mod explicate_control;
+pub mod rco;

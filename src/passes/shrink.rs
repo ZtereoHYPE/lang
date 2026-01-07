@@ -1,13 +1,9 @@
-use crate::states::ast::{Expression, Item, Literal, Program, Operator, Statement};
+use crate::states::ast::{Expression, Literal, Program, Operator, Statement};
 
 // Shrinks a program by removing expressions not available in x86
 pub fn shrink_program(program: &mut Program) {
-    for item in &mut program.items {
-        match item {
-            Item::Function { body, .. } => {
-                *body = shrink_expr(body.clone());
-            }
-        }
+    for function in &mut program.functions {
+        function.body = shrink_expr(function.body.clone());
     }
 }
 

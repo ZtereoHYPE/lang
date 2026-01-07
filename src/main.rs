@@ -3,9 +3,11 @@ use crate::passes::resolve_symbols::resolve_symbols;
 use crate::passes::resolve_types::resolve_types;
 use crate::passes::shrink::shrink_program;
 use std::fs;
+use crate::passes::uniquify::uniquify_program;
 
 mod states;
 mod passes;
+mod naming;
 
 fn main() {
     let input_file = fs::read_to_string("lang.lang").expect("cannot read file");
@@ -15,6 +17,7 @@ fn main() {
     resolve_symbols(&mut ast);
     resolve_types(&mut ast);
     shrink_program(&mut ast);
+    uniquify_program(&mut ast);
 
     println!("{:?}", ast);
 }

@@ -230,7 +230,7 @@ impl FromParseTree for Operator {
             Rule::negnot => if op.as_str() == "-"  {Self::Negated}  else {Self::Not},
             Rule::logic  => {
                 let str = op.as_str();
-                if      str == "&&" { Self::And }
+                if      str == "&"  { Self::And }
                 else if str == "|"  { Self::Or }
                 else                { Self::Xor }
             }

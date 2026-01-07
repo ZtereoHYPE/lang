@@ -15,8 +15,6 @@ pub fn shrink_expr(e: Expression) -> Expression {
 
             match op {
                 Operator::And => {
-                    println!("shrinking and");
-
                     Expression::If { 
                         expression: l1,
                         then: r1, 

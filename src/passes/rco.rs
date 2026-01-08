@@ -1,4 +1,4 @@
-use crate::states::ast::{Expression, Identifier, Item, Program, Statement, SymbolTable, Type};
+use crate::states::ast::{Expression, Identifier, Literal, Program, Statement, SymbolTable, Type};
 
 /// Remove Complex Operands
 ///
@@ -17,21 +17,17 @@ use crate::states::ast::{Expression, Identifier, Item, Program, Statement, Symbo
 pub fn remove_complex_operands(program: &mut Program) {
     let mut tmp_gen = TempGen::default();
 
-    for item in &mut program.items {
-        match item {
-            Item::Function { body, .. } => {
-                let (stmts, expr) = rco_expr(body.clone(), &mut tmp_gen);
-                *body = if stmts.is_empty() {
-                    expr
-                } else {
-                    Expression::Block {
-                        symbols: SymbolTable::new(),
-                        statements: stmts,
-                        expression: Some(Box::new(expr)),
-                    }
-                };
+    for function in &mut program.functions {
+        let (stmts, expr) = rco_expr(function.body.clone(), &mut tmp_gen);
+        function.body = if stmts.is_empty() {
+            expr
+        } else {
+            Expression::Block {
+                symbols: SymbolTable::new(),
+                statements: stmts,
+                expression: Some(Box::new(expr)),
             }
-        }
+        };
     }
 }
 
@@ -101,7 +97,7 @@ fn rco_expr(expr: Expression, tmp_gen: &mut TempGen) -> (Vec<Statement>, Express
                 out_args.push(a);
             }
 
-            (out_stmts, Expression::FunctionCall {id, args: out_args})
+            (out_stmts, Expression::FunctionCall { id, args: out_args })
         }
         Expression::If {
             expression,
@@ -155,7 +151,9 @@ fn rco_expr(expr: Expression, tmp_gen: &mut TempGen) -> (Vec<Statement>, Express
             s1.append(&mut s2);
 
             let block_new = {
-                let (stmts, expr) = rco_expr(*block, tmp_gen);
+                let (mut stmts, expr) = rco_expr(*block, tmp_gen);
+                stmts.append(&mut s1.clone());
+                
                 if stmts.is_empty() {
                     expr
                 } else {
@@ -166,6 +164,7 @@ fn rco_expr(expr: Expression, tmp_gen: &mut TempGen) -> (Vec<Statement>, Express
                     }
                 }
             };
+            
             (
                 s1,
                 Expression::While {
@@ -186,12 +185,16 @@ fn rco_expr(expr: Expression, tmp_gen: &mut TempGen) -> (Vec<Statement>, Express
                     Statement::Assignment { id, expression } => {
                         let (mut s, e) = rco_expr(expression, tmp_gen);
                         out_statements.append(&mut s);
-                        out_statements.push(Statement::Assignment {id, expression: e});
+                        out_statements.push(Statement::Assignment { id, expression: e });
                     }
                     Statement::Declaration { id, ty, expression } => {
                         let (mut s, e) = rco_expr(expression, tmp_gen);
                         out_statements.append(&mut s);
-                        out_statements.push(Statement::Declaration {id, ty, expression: e});
+                        out_statements.push(Statement::Declaration {
+                            id,
+                            ty,
+                            expression: e,
+                        });
                     }
                     Statement::Expression(e) => {
                         let (mut s, e2) = rco_expr(e, tmp_gen);
@@ -206,7 +209,7 @@ fn rco_expr(expr: Expression, tmp_gen: &mut TempGen) -> (Vec<Statement>, Express
                 out_statements.append(&mut s);
                 Some(Box::new(e))
             } else {
-                None
+                Some(Box::new(Expression::Literal(Literal::Unit())))
             };
 
             (
@@ -234,8 +237,5 @@ fn ensure_atomic(expr: Expression, tmp_gen: &mut TempGen) -> (Vec<Statement>, Ex
         expression: expr,
     };
 
-    (
-        vec![decl],
-        Expression::Variable { id: tmp },
-    )
+    (vec![decl], Expression::Variable { id: tmp })
 }

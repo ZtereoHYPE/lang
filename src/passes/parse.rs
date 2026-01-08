@@ -1,4 +1,4 @@
-use crate::states::ast::{Expression, Identifier, Item, Literal, Operator, Program, Statement, Type};
+use crate::states::ast::{Expression, Function, Identifier, Literal, Operator, Program, Statement, Type};
 use itertools::Itertools;
 use pest::error::{ErrorVariant, LineColLocation};
 use pest::iterators::{Pair, Pairs};
@@ -83,16 +83,16 @@ impl FromParseTree for Program {
         let symbols = HashMap::new();
 
         Ok(Self {
-            items: pair
+            functions: pair
                 .into_inner()
-                .map(|i| Item::from_pair(i))
+                .map(|i| Function::from_pair(i))
                 .process_results(|r| r.collect())?, // stop at the first Err
             symbols
         })
     }
 }
 
-impl FromParseTree for Item {
+impl FromParseTree for Function {
     fn from_pair(pair: Pair<Rule>) -> Result<Self, AstParseError> {
         let pair = check_pair(pair, Rule::function)?;
 
@@ -110,7 +110,7 @@ impl FromParseTree for Item {
 
         let symbols = HashMap::new();
 
-        Ok(Item::Function { id, params, ty, body, symbols })
+        Ok(Self { id, params, ty, body, symbols })
     }
 }
 
@@ -230,7 +230,7 @@ impl FromParseTree for Operator {
             Rule::negnot => if op.as_str() == "-"  {Self::Negated}  else {Self::Not},
             Rule::logic  => {
                 let str = op.as_str();
-                if      str == "&&" { Self::And }
+                if      str == "&"  { Self::And }
                 else if str == "|"  { Self::Or }
                 else                { Self::Xor }
             }

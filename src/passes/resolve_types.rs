@@ -1,5 +1,4 @@
-use crate::states::ast::Item::Function;
-use crate::states::ast::{Expression, Item, Program, Statement, Symbol, Type};
+use crate::states::ast::{Expression, Function, Program, Statement, Symbol, Type};
 use crate::states::scope::ScopeStack;
 
 struct TypeError {
@@ -23,32 +22,30 @@ pub fn resolve_types(program: &mut Program) {
 impl Program {
     fn resolve_types(&mut self, stack: ScopeStack) -> Result<(), TypeError> {
         // Add all the function types to the symbol table
-        for Function {id, params, ty, ..} in &self.items {
+        for Function {id, params, ty, ..} in &self.functions {
             let params = params.iter().map(|(_, ty)| *ty).collect::<Vec<_>>();
             self.symbols.insert(id.clone(), Symbol::Function {ty: *ty, params});
         }
 
         // Recursively populate the symbols down the tree, with the additional local scope
-        for item in &mut self.items {
-            item.resolve_types(stack.with_scope(&self.symbols))?;
+        for fucnction in &mut self.functions {
+            fucnction.resolve_types(stack.with_scope(&self.symbols))?;
         }
 
         Ok(())
     }
 }
 
-impl Item {
-    fn resolve_types(&mut self, stack: ScopeStack) -> Result<(), TypeError> { match self {
-        Function { symbols, params, body, .. } => {
-            // Add all parameters to the symbol list, as long as there's no collision
-            for (id, ty) in params {
-                symbols.insert(id.clone(), Symbol::Variable {ty: *ty});
-            }
-
-            body.resolve_type(stack.with_scope(symbols))?;
-            Ok(())
+impl Function {
+    fn resolve_types(&mut self, stack: ScopeStack) -> Result<(), TypeError> {
+        // Add all parameters to the symbol list, as long as there's no collision
+        for (id, ty) in &self.params {
+            self.symbols.insert(id.clone(), Symbol::Variable {ty: *ty});
         }
-    }}
+
+        self.body.resolve_type(stack.with_scope(&self.symbols))?;
+        Ok(())
+    }
 }
 
 impl Expression {

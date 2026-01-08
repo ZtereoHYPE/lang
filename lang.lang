@@ -1,10 +1,11 @@
 fn funnyName(x: Int): Int = x + 13
 
 fn tester(): Unit = {
-    let x: Bool = false;
+    let x: Bool = false & true;
 
     let y: Int = if x {
-        10
+        let x: Int = 10;
+        x
     } else {
         -10
     };

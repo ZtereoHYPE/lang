@@ -2,20 +2,23 @@ use crate::passes::parse::parse_file;
 use crate::passes::rco::remove_complex_operands;
 use crate::passes::resolve_symbols::resolve_symbols;
 use crate::passes::resolve_types::resolve_types;
+use crate::passes::shrink::shrink_program;
 use std::fs;
+use crate::passes::uniquify::uniquify_program;
 
 mod states;
 mod passes;
+mod naming;
 
 fn main() {
     let input_file = fs::read_to_string("lang.lang").expect("cannot read file");
 
     let mut ast = parse_file(input_file);
+
     resolve_symbols(&mut ast);
     resolve_types(&mut ast);
+    shrink_program(&mut ast);
+    uniquify_program(&mut ast);
 
-    // basic lowering preparation to ensure operands are atomic
-    remove_complex_operands(&mut ast);
-
-    // println!("{:?}", ast);
+    println!("{:?}", ast);
 }

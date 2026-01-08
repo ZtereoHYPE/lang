@@ -1,16 +1,17 @@
-use crate::naming::Namer;
+use std::collections::HashMap;
 use crate::states::{ast, ir};
-use crate::states::ast::{Expression, Identifier};
+use crate::states::ast::Identifier;
 
 pub fn explicate_control(program: ast::Program) -> ir::Program {
-    let mut expl = ExplicateControl { namer: Namer::new(), blocks: vec![] };
+    let mut expl = ExplicateControl { block_idx: 0, tmp_idx: 0, blocks: HashMap::new() };
     expl.explicate_program(program)
 }
 
 // state for ExplicateControl
 struct ExplicateControl {
-    namer: Namer,
-    blocks: Vec<ir::Block>
+    block_idx: usize,
+    tmp_idx: usize,
+    blocks: HashMap<String, ir::Block>
 }
 
 impl ExplicateControl {
@@ -24,10 +25,9 @@ impl ExplicateControl {
     }
 
     fn explicate_function(&mut self, function: ast::Function) -> ir::Function {
-        self.namer.set_fn_name(function.id.id.clone());
+        self.block_idx = 0;
 
-        let first_block = self.explicate_fn_body(function.body);
-        self.blocks.insert(0, first_block);
+        let first_label = self.explicate_fn_body(function.body);
 
         ir::Function {
             name: function.id,
@@ -36,23 +36,36 @@ impl ExplicateControl {
         }
     }
 
-    fn explicate_fn_body(&mut self, fn_body: ast::Expression) -> ir::Block {
-        let name = self.namer.block_name("");
+    fn explicate_fn_body(&mut self, fn_body: ast::Expression) { // todo: string aint right
+        let name = self.block_label();
         match fn_body {
-            // todo: waiting for 
-            ast::Expression::If { expression, then, else_expr } => todo!("Waiting on previous pass"),
+            ast::Expression::If { expression, then, else_expr } => {
+                let condition = self.explicate_atom(*expression); // assertion: if statements have atoms as expression
+                // let after_label =
+                // let then_label = self.explicate_block(*then); // maybe the name can be defined here..?
+                // let else_label = if else_expr.is_some() {
+                //     self.explicate_block(*else_expr.unwrap())
+                // } else {
+                //     after_label.clone() // if there is no else, jump directly to the after block
+                // };
+                //
+                //
+                // self.create_block(
+                //     vec![],
+                //     ir::Terminal::Return(self.explicate_expression(e))
+                // )
+            },
             ast::Expression::While { expression, block } => todo!("Waiting on previous pass"),
             ast::Expression::Block { statements, expression, .. } => todo!("Waiting on previous pass"),
-            
-            e => ir::Block {
-                name,
-                assignments: vec![],
-                terminal: ir::Terminal::Return(self.explicate_expression(e)),
-            }
+
+            e => {self.create_block(
+                vec![],
+                ir::Terminal::Return(self.explicate_expression(e))
+            );}
         }
     }
 
-    fn explicate_block(&mut self, expr: ast::Expression) -> ir::Block {match expr {
+    fn explicate_block(&mut self, expr: ast::Expression) -> Vec<ir::Assignment> { match expr {
         _ => todo!("Waiting on previous pass")
     }}
 
@@ -83,7 +96,8 @@ impl ExplicateControl {
         e => panic!("Expression should be an Atom! Found {:?} instead", e)
     }}
 
-    fn explicate_statement(&mut self, statement: ast::Statement) -> (Identifier, ir::Expression) { match statement {
+    // todo: these are wrong! Expressions here don't have to be the limited IR expression, they can be if or blocks!
+    fn explicate_statement(&mut self, statement: ast::Statement) -> ir::Assignment { match statement {
         ast::Statement::Assignment { id, expression } |
         ast::Statement::Declaration { id, expression, .. } => (id, self.explicate_expression(expression)),
 
@@ -95,16 +109,24 @@ impl ExplicateControl {
         }
     }}
 
-    fn create_block(&mut self, block: ir::Block) -> String {
+    fn create_block(&mut self, assignments: Vec<(Identifier, ir::Expression)>, terminal: ir::Terminal) {
         // This block is just a goto to somewhere, return that somewhere directly.
-        if let ir::Terminal::Goto{ label } = &block.terminal
-            && block.assignments.is_empty() {
-            return label.clone()
+        if let ir::Terminal::Goto{ label } = &terminal && assignments.is_empty() {
+            return;
         }
 
         // Else, push the block to the new blocks, and return its label
-        let label = block.name.clone();
-        self.blocks.push(block);
-        label
+        let name = self.block_label();
+        self.blocks.push(ir::Block { name, assignments, terminal });
+    }
+
+    pub fn block_label(&mut self) -> String {
+        self.block_idx += 1;
+        format!("block_{}", self.block_idx)
+    }
+
+    pub fn tmp_id(&mut self) -> Identifier {
+        self.tmp_idx += 1;
+        Identifier { id: format!("_{}", self.tmp_idx) }
     }
 }

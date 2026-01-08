@@ -1,4 +1,5 @@
 use crate::passes::parse::parse_file;
+use crate::passes::rco::remove_complex_operands;
 use crate::passes::resolve_symbols::resolve_symbols;
 use crate::passes::resolve_types::resolve_types;
 use crate::passes::shrink::shrink_program;

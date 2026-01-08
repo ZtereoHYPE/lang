@@ -1,5 +1,7 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use crate::states::ast::{Identifier, Literal, Operator};
+
+pub type Assignment = (Identifier, Expression);
 
 #[derive(Clone, Debug)]
 pub struct Program {
@@ -10,13 +12,15 @@ pub struct Program {
 pub struct Function {
     pub name: Identifier,
     pub params: Vec<Identifier>,
-    pub blocks: Vec<Block>
+    pub entrypoint: String,
+    pub blocks: HashMap<String, Block>
 }
 
 #[derive(Clone, Debug)]
 pub struct Block {
     pub name: String,
-    pub assignments: Vec<(Identifier, Expression)>,
+    pub liveness: Vec<HashSet<Identifier>>,
+    pub assignments: Vec<Assignment>,
     pub terminal: Terminal
 }
 
@@ -63,17 +67,4 @@ pub enum Atom {
     },
 
     Value(Literal)
-}
-
-impl Block {
-    // for CFG navigation
-    pub fn children(&self) -> HashSet<&String> { match &self.terminal {
-        Terminal::Goto { label } => 
-            HashSet::from([label]),
-        
-        Terminal::Conditional { then_label, else_label, .. } => 
-            HashSet::from([then_label, else_label]),
-        
-        Terminal::Return(_) => HashSet::new()
-    }}
 }

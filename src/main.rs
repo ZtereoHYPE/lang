@@ -8,7 +8,6 @@ use std::fs;
 
 mod states;
 mod passes;
-mod naming;
 
 fn main() {
     let input_file = fs::read_to_string("lang.lang").expect("cannot read file");
@@ -22,7 +21,7 @@ fn main() {
 
     // ...
 
-    let ir = explicate_control(ast);
+    // let ir = explicate_control(ast);
 
     println!("{:?}", ir);
 }

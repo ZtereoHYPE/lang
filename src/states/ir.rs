@@ -1,21 +1,45 @@
+use std::collections::{HashMap, HashSet};
 use crate::states::ast::{Identifier, Literal, Operator};
 
+pub type Assignment = (Identifier, Expression);
+
+#[derive(Clone, Debug)]
 pub struct Program {
-    blocks: Vec<Block>,
+    pub functions: Vec<Function>,
 }
 
+#[derive(Clone, Debug)]
+pub struct Function {
+    pub name: Identifier,
+    pub params: Vec<Identifier>,
+    pub entrypoint: String,
+    pub blocks: HashMap<String, Block>
+}
 
+#[derive(Clone, Debug)]
 pub struct Block {
     pub name: String,
+    pub liveness: Vec<HashSet<Identifier>>,
     pub assignments: Vec<Assignment>,
-    pub terminal: Box<Terminal>
+    pub terminal: Terminal
 }
 
-pub struct Assignment {
-    pub var: Identifier,
-    pub expression: Expression
+#[derive(Clone, Debug)]
+pub enum Terminal {
+    Goto {
+        label: String,
+    },
+
+    Conditional {
+        condition: Atom,
+        then_label: String,
+        else_label: String
+    },
+
+    Return(Expression)
 }
 
+#[derive(Clone, Debug)]
 pub enum Expression {
     Unary {
         op: Operator,
@@ -26,9 +50,17 @@ pub enum Expression {
         lhs: Atom,
         op: Operator,
         rhs: Atom
-    }
+    },
+
+    FunCall {
+        id: Identifier,
+        args: Vec<Atom>
+    },
+
+    Atom(Atom)
 }
 
+#[derive(Clone, Debug)]
 pub enum Atom {
     Variable {
         id: Identifier
@@ -36,36 +68,3 @@ pub enum Atom {
 
     Value(Literal)
 }
-
-pub enum Terminal {
-    Return {
-        expression: Expression
-    },
-
-    Goto {
-        label: String,
-    },
-
-    Conditional {
-        condition: Expression,
-        if_branch: Box<Terminal>,
-        else_branch: Box<Terminal>
-    },
-}
-
-// enum Terminal {
-//     Return(Return),
-//     Goto(Goto),
-//     Conditional(Conditional),
-// }
-// struct Return {
-//     expression: Expression
-// }
-// struct Goto {
-//     label: String,
-// }
-// struct Conditional {
-//     condition: Expression,
-//     if_branch: Goto,
-//     else_branch: Goto
-// }

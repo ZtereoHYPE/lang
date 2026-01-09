@@ -1,5 +1,6 @@
-use crate::states::ast::Identifier;
-use crate::states::ir::{Assignment, Terminal};
+use std::clone;
+use crate::states::ast::{Identifier, Literal};
+use crate::states::ir::{Assignment, Atom, Terminal};
 use crate::states::{ast, ir};
 use std::collections::HashMap;
 
@@ -12,9 +13,10 @@ pub fn explicate_control(program: ast::Program) -> ir::Program {
     expl.explicate_program(program)
 }
 
-enum ExprContext {
-    Return,
-    Assign(Identifier),
+#[derive(Clone)]
+enum Tail {
+    Assign(ir::Assignment, Box<Tail>),
+    Term(ir::Terminal),
 }
 
 // state for ExplicateControl
@@ -38,161 +40,171 @@ impl ExplicateControl {
     fn explicate_function(&mut self, function: ast::Function) -> ir::Function {
         self.block_idx = 0;
 
-        let first_block_name = format! {"block_{}", self.block_idx};
-
-        // todo: clean this up
-        let (ass, term) = self.explicate(function.body, ExprContext::Return);
-
-        let name = self.block_label();
-        self.blocks.insert(
-            name.clone(),
-            ir::Block {
-                name: name.clone(),
-                liveness: vec![],
-                assignments: ass,
-                terminal: term.unwrap(),
-            },
-        );
+        let tail = self.explicate_tail(function.body);
+        let entrypoint = self.create_block(tail);
 
         ir::Function {
             name: function.id,
-            entrypoint: first_block_name,
+            entrypoint,
             params: function.params.into_iter().map(|(i, _)| i).collect(),
             blocks: std::mem::take(&mut self.blocks), // this also clears self.blocks, ready for the next function. Neat!
         }
     }
 
-    fn explicate(
-        &mut self,
-        expr: ast::Expression,
-        ctx: ExprContext,
-    ) -> (Vec<Assignment>, Option<Terminal>) {
+    const RETURN_UNIT: Tail = Tail::Term(ir::Terminal::Return(ir::Expression::Atom(ir::Atom::Value(Literal::Unit()))));
+
+    fn explicate_tail(&mut self, expr: ast::Expression) -> Tail {
         match expr {
-            ast::Expression::UnaryOp { .. }
-            | ast::Expression::BinaryOp { .. }
-            | ast::Expression::FunctionCall { .. }
-            | ast::Expression::Variable { .. }
-            | ast::Expression::Literal(_) => {
-                let expr = self.explicate_expression(expr);
-                match ctx {
-                    ExprContext::Return => (vec![], Some(Terminal::Return(expr))),
-                    ExprContext::Assign(x) => (vec![(x, expr)], None),
-                }
-            }
-
-            ast::Expression::Block {
-                statements,
-                expression,
-                ..
-            } => {
-                let mut stats = statements
+            ast::Expression::Block { statements, expression, .. } => {
+                statements
                     .into_iter()
-                    .flat_map(|s| self.explicate_statement(s))
-                    .collect::<Vec<_>>();
-
-                let (mut ass, term) = self.explicate(*expression.unwrap(), ctx);
-                stats.append(&mut ass);
-
-                (stats, term)
+                    .rev()
+                    .fold(
+                        self.explicate_tail(*expression.unwrap()),
+                        |a, s| self.explicate_statement(s, a)
+                    )
             }
 
-            ast::Expression::If {
-                expression,
-                then,
-                else_expr,
-            } => {
-                // INITIAL BLOCK
-                let condition = self.explicate_atom(*expression);
-                // todo: this is not nice. We are returning the last block such that gotos can be appended to it by create_block but it means that the statements from the parent block case dont wokr
-
-                // BRANCH BLOCKS
-                let final_label = self.block_label();
-                let ass_id = match ctx {
-                    ExprContext::Return => self.tmp_id(),
-                    ExprContext::Assign(id) => id,
+            // only instance of code duplication: both the branches of the if statement return the expression!
+            ast::Expression::If { expression, then, else_expr } => {
+                let then_label = {
+                    let tail = self.explicate_tail(*then);
+                    self.create_block(tail)
                 };
 
-                let (t_ass, _) = self.explicate(*then, ExprContext::Assign(ass_id));
-                let (e_ass, _) = self.explicate(*else_expr.unwrap(), ExprContext::Assign(ass_id)); // todo: we are lying
-                self.create_block(t_ass, ir::Terminal::Goto { label: final_label });
-                self.create_block(e_ass, ir::Terminal::Goto { label: final_label });
+                let else_label = if let Some(else_expr) = else_expr {
+                    let tail = self.explicate_tail(*else_expr);
+                    self.create_block(tail)
+                } else {
+                    self.create_block(Self::RETURN_UNIT)
+                };
 
-                // FINAL BLOCK
-                match ctx {
-                    ExprContext::Return => (
-                        vec![],
-                        Some(Terminal::Return(ir::Expression::Atom(ir::Atom::Variable {
-                            id: ass_id,
-                        }))),
-                    ),
-                    ExprContext::Assign(x) => (vec![], None),
-                }
+                Tail::Term(Terminal::Conditional{
+                    condition: atom_of(*expression),
+                    then_label,
+                    else_label
+                })
             }
 
-            ast::Expression::While { .. } => {
-                // todo
+            ast::Expression::While { expression, block } => {
+                let condition_label = self.block_label();
+
+                let then_label = {
+                    let tmp_id = self.tmp_id();
+                    let tail = self.explicate_assignment(*block, tmp_id, Tail::Term(Terminal::Goto {label: condition_label.clone()}));
+                    self.create_block(tail)
+                };
+
+                let else_label = self.create_block(Self::RETURN_UNIT);
+
+                self.create_named_block(
+                    Tail::Term(Terminal::Conditional {
+                        condition: atom_of(*expression),
+                        then_label,
+                        else_label
+                    }),
+                    condition_label.clone()
+                );
+
+                Tail::Term(Terminal::Goto {label: condition_label})
             }
+
+            e => Tail::Term(Terminal::Return(expr_of(e)))
         }
     }
 
-    fn explicate_expression(&mut self, expr: ast::Expression) -> ir::Expression {
+    fn explicate_assignment(&mut self, expr: ast::Expression, id: Identifier, cont: Tail) -> Tail {
         match expr {
-            ast::Expression::UnaryOp { op, expr } => ir::Expression::Unary {
-                op,
-                atom: self.explicate_atom(*expr),
-            },
-
-            ast::Expression::BinaryOp { lhs, op, rhs } => ir::Expression::Binary {
-                lhs: self.explicate_atom(*lhs),
-                op,
-                rhs: self.explicate_atom(*rhs),
-            },
-
-            ast::Expression::FunctionCall { id, args } => {
-                let args = args.into_iter().map(|a| self.explicate_atom(a)).collect();
-                ir::Expression::FunCall { id, args }
+            ast::Expression::Block { statements, expression, .. } => {
+                statements
+                    .into_iter()
+                    .fold(
+                        self.explicate_assignment(*expression.unwrap(), id, cont),
+                        |t, s| self.explicate_statement(s, t)
+                    )
             }
 
-            atom => ir::Expression::Atom(self.explicate_atom(atom)),
+            ast::Expression::If { expression, then, else_expr } => {
+                let after_label = self.create_block(cont);
+
+                let then_label = {
+                    let tail = self.explicate_assignment(*then, id.clone(), Tail::Term(Terminal::Goto { label: after_label.clone() }));
+                    self.create_block(tail)
+                };
+
+                let else_label = if let Some(else_expr) = else_expr {
+                    let tail = self.explicate_assignment(*else_expr, id, Tail::Term(Terminal::Goto { label: after_label }));
+                    self.create_block(tail)
+                } else {
+                    after_label
+                };
+
+                Tail::Term(Terminal::Conditional{
+                    condition: atom_of(*expression),
+                    then_label,
+                    else_label
+                })
+            }
+
+            ast::Expression::While { expression, block } => {
+                let condition_label = self.block_label();
+
+                let then_label = {
+                    let tmp_id = self.tmp_id();
+                    let tail = self.explicate_assignment(*block, tmp_id, Tail::Term(Terminal::Goto {label: condition_label.clone()}));
+                    self.create_block(tail)
+                };
+
+                let else_label = {
+                    let tail = self.explicate_assignment(ast::Expression::Literal(Literal::Unit()), id, cont);
+                    self.create_block(tail)
+                };
+
+                self.create_named_block(
+                    Tail::Term(Terminal::Conditional {
+                        condition: atom_of(*expression),
+                        then_label,
+                        else_label
+                    }),
+                    condition_label.clone()
+                );
+
+                Tail::Term(Terminal::Goto {label: condition_label})
+
+            }
+
+            e => Tail::Assign((id, expr_of(e)), Box::new(cont))
         }
     }
 
-    fn explicate_atom(&mut self, atom: ast::Expression) -> ir::Atom {
-        match atom {
-            ast::Expression::Variable { id } => ir::Atom::Variable { id },
-            ast::Expression::Literal(val) => ir::Atom::Value(val),
-
-            e => panic!("Expression should be an Atom! Found {:?} instead", e),
-        }
-    }
-
-    fn explicate_statement(&mut self, statement: ast::Statement) -> Vec<ir::Assignment> {
+    fn explicate_statement(&mut self, statement: ast::Statement, cont: Tail) -> Tail {
         match statement {
             ast::Statement::Assignment { id, expression }
             | ast::Statement::Declaration { id, expression, .. } => {
-                let (ass, _) = self.explicate(expression, ExprContext::Assign(id));
-                ass
+                self.explicate_assignment(expression, id, cont)
             }
 
             ast::Statement::Expression(expr) => {
                 let tmp_id = self.tmp_id();
-                let (ass, _) = self.explicate(expr, ExprContext::Assign(tmp_id));
-                ass
+                self.explicate_assignment(expr, tmp_id, cont)
             }
         }
     }
 
-    fn create_block(
-        &mut self,
-        assignments: Vec<(Identifier, ir::Expression)>,
-        terminal: ir::Terminal,
-    ) {
-        // // This block is just a goto to somewhere, return that somewhere directly.
-        // if let ir::Terminal::Goto{ label } = &terminal && assignments.is_empty() {
-        //     return;
-        // }
+    fn create_block(&mut self, block: Tail) -> String {
+        if let Tail::Term(ir::Terminal::Goto{ label }) = block {
+            // This block is just a goto to somewhere, return that somewhere directly.
+            return label;
+        }
 
         let name = self.block_label();
+        self.create_named_block(block, name.clone());
+        name
+    }
+
+    fn create_named_block(&mut self, block: Tail, name: String) {
+        let (assignments, terminal) = tail_to_ass_term(block);
+
         self.blocks.insert(
             name.clone(),
             ir::Block {
@@ -204,15 +216,59 @@ impl ExplicateControl {
         );
     }
 
-    pub fn block_label(&mut self) -> String {
+    fn block_label(&mut self) -> String {
         self.block_idx += 1;
         format!("block_{}", self.block_idx)
     }
 
-    pub fn tmp_id(&mut self) -> Identifier {
+    fn tmp_id(&mut self) -> Identifier {
         self.tmp_idx += 1;
         Identifier {
             id: format!("_{}", self.tmp_idx),
         }
+    }
+}
+
+fn tail_to_ass_term(mut tail: Tail) -> (Vec<Assignment>, Terminal) {
+    let mut assignments = Vec::new();
+
+    while let Tail::Assign(a, t) = tail {
+        assignments.push(a);
+        tail = *t;
+    }
+
+    let Tail::Term(terminal) = tail else { unreachable!() };
+
+    (assignments, terminal)
+}
+
+fn expr_of(expr: ast::Expression) -> ir::Expression {
+    match expr {
+        ast::Expression::UnaryOp { op, expr } => ir::Expression::Unary {
+            op,
+            atom: atom_of(*expr),
+        },
+
+        ast::Expression::BinaryOp { lhs, op, rhs } => ir::Expression::Binary {
+            lhs: atom_of(*lhs),
+            op,
+            rhs: atom_of(*rhs),
+        },
+
+        ast::Expression::FunctionCall { id, args } => {
+            let args = args.into_iter().map(|a| atom_of(a)).collect();
+            ir::Expression::FunCall { id, args }
+        }
+
+        atom => ir::Expression::Atom(atom_of(atom)),
+    }
+}
+
+fn atom_of(atom: ast::Expression) -> ir::Atom {
+    match atom {
+        ast::Expression::Variable { id } => ir::Atom::Variable { id },
+        ast::Expression::Literal(val) => ir::Atom::Value(val),
+
+        e => panic!("Expression should be an Atom! Found {:?} instead", e),
     }
 }

@@ -76,7 +76,6 @@ impl Expression {
 
         Expression::FunctionCall { id, args } => {
             // Check that the identifier points to a function and not a variable
-            // todo: this code would be much simpler if we supported higher order functions!
             if let Some(Symbol::Function { ty, params }) = stack.resolve_symbol(id) {
                 // Check for the right amount of arguments
                 if params.len() != args.len() {

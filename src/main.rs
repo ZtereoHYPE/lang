@@ -7,9 +7,11 @@ use crate::passes::shrink::shrink_program;
 use crate::passes::uniquify::uniquify_program;
 use std::fs;
 use crate::passes::liveness_analysis::analyze_liveness;
+use crate::tui::run_tui;
 
 mod states;
 mod passes;
+mod tui;
 
 fn main() {
     let input_file = fs::read_to_string("lang.lang").expect("cannot read file");
@@ -24,5 +26,5 @@ fn main() {
     let mut ir = explicate_control(ast);
     analyze_liveness(&mut ir);
 
-    println!("{:?}", ir);
+    run_tui(ir).expect("Uh oh");
 }

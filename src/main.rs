@@ -1,16 +1,17 @@
 use crate::passes::explicate_control::explicate_control;
+use crate::passes::interpret::interpret_to_string;
+use crate::passes::liveness_analysis::analyze_liveness;
 use crate::passes::parse::parse_file;
 use crate::passes::rco::remove_complex_operands;
 use crate::passes::resolve_symbols::resolve_symbols;
 use crate::passes::resolve_types::resolve_types;
 use crate::passes::shrink::shrink_program;
 use crate::passes::uniquify::uniquify_program;
-use std::fs;
-use crate::passes::liveness_analysis::analyze_liveness;
 use crate::tui::run_tui;
+use std::fs;
 
-mod states;
 mod passes;
+mod states;
 mod tui;
 
 fn main() {
@@ -19,12 +20,19 @@ fn main() {
     let mut ast = parse_file(input_file);
     resolve_symbols(&mut ast);
     resolve_types(&mut ast);
+
+    // interpret the program before changes
+    println!("Interpreter Output");
+    println!("{}", interpret_to_string(&ast));
+    println!();
     shrink_program(&mut ast);
     uniquify_program(&mut ast);
     remove_complex_operands(&mut ast);
-
     let mut ir = explicate_control(ast);
     analyze_liveness(&mut ir);
+
+    println!("Liveness Analysis");
+    println!("{:?}", ir);
 
     run_tui(ir).expect("Uh oh");
 }

@@ -129,3 +129,129 @@ fn shrink_statement(s: Statement) -> Statement { match s {
     Statement::Declaration { id, ty, expression } =>
         Statement::Declaration { id, ty, expression: shrink_expr(expression) }
 }}
+
+
+#[cfg(test)]
+mod tests {
+    use crate::states::ast::Identifier;
+    use crate::states::ast::Type;
+
+    use super::*;
+
+    #[test]
+    fn test_shrink_and_operator() {
+        let expr = Expression::BinaryOp {
+            lhs: Box::new(Expression::Literal(Literal::Bool(true))),
+            op: Operator::And,
+            rhs: Box::new(Expression::Literal(Literal::Bool(false))),
+        };
+
+        let result = shrink_expr(expr);
+        matches!(result, Expression::If { .. });
+    }
+
+    #[test]
+    fn test_shrink_or_operator() {
+        let expr = Expression::BinaryOp {
+            lhs: Box::new(Expression::Literal(Literal::Bool(false))),
+            op: Operator::Or,
+            rhs: Box::new(Expression::Literal(Literal::Bool(true))),
+        };
+
+        let result = shrink_expr(expr);
+        matches!(result, Expression::If { .. });
+    }
+
+    #[test]
+    fn test_shrink_xor_operator() {
+        let expr = Expression::BinaryOp {
+            lhs: Box::new(Expression::Literal(Literal::Bool(true))),
+            op: Operator::Xor,
+            rhs: Box::new(Expression::Literal(Literal::Bool(true))),
+        };
+
+        let result = shrink_expr(expr);
+        matches!(result, Expression::If { .. });
+    }
+
+    #[test]
+    fn test_shrink_arithmetic_operator() {
+        let expr = Expression::BinaryOp {
+            lhs: Box::new(Expression::Literal(Literal::Int(5))),
+            op: Operator::Plus,
+            rhs: Box::new(Expression::Literal(Literal::Int(3))),
+        };
+
+        let result = shrink_expr(expr);
+        matches!(result, Expression::BinaryOp { .. });
+    }
+
+    #[test]
+    fn test_shrink_unary_op() {
+        let expr = Expression::UnaryOp {
+            op: Operator::Not,
+            expr: Box::new(Expression::Literal(Literal::Bool(true))),
+        };
+
+        let result = shrink_expr(expr);
+        matches!(result, Expression::UnaryOp { .. });
+    }
+
+    #[test]
+    fn test_shrink_if_with_else() {
+        let expr = Expression::If {
+            expression: Box::new(Expression::Literal(Literal::Bool(true))),
+            then: Box::new(Expression::Literal(Literal::Int(1))),
+            else_expr: Some(Box::new(Expression::Literal(Literal::Int(2)))),
+        };
+
+        let result = shrink_expr(expr);
+        matches!(result, Expression::If { .. });
+    }
+
+    #[test]
+    fn test_shrink_if_without_else() {
+        let expr = Expression::If {
+            expression: Box::new(Expression::Literal(Literal::Bool(true))),
+            then: Box::new(Expression::Literal(Literal::Int(1))),
+            else_expr: None,
+        };
+
+        let result = shrink_expr(expr);
+        matches!(result, Expression::If { .. });
+    }
+
+    #[test]
+    fn test_shrink_literal() {
+        let expr = Expression::Literal(Literal::Int(42));
+        let result = shrink_expr(expr.clone());
+        assert_eq!(format!("{:?}", result), format!("{:?}", expr));
+    }
+
+    #[test]
+    fn test_shrink_assignment() {
+        let stmt = Statement::Assignment {
+            id: Identifier{id: "x".to_string()},
+            expression: Expression::BinaryOp {
+                lhs: Box::new(Expression::Literal(Literal::Int(1))),
+                op: Operator::And,
+                rhs: Box::new(Expression::Literal(Literal::Int(2))),
+            },
+        };
+
+        let result = shrink_statement(stmt);
+        matches!(result, Statement::Assignment { .. });
+    }
+
+    #[test]
+    fn test_shrink_declaration() {
+        let stmt = Statement::Declaration {
+            id: Identifier{ id: "y".to_string() },
+            ty: Type::Int,
+            expression: Expression::Literal(Literal::Int(10)),
+        };
+
+        let result = shrink_statement(stmt);
+        matches!(result, Statement::Declaration { .. });
+    }
+}

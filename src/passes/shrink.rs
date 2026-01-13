@@ -135,7 +135,6 @@ fn shrink_statement(s: Statement) -> Statement { match s {
 mod tests {
     use crate::states::ast::Identifier;
     use crate::states::ast::Type;
-
     use super::*;
 
     #[test]

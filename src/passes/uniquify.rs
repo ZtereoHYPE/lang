@@ -99,13 +99,9 @@ impl Uniquify {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::states::ast::{
-        Expression, Literal, Operator, SymbolTable,
-        Type,
-    };
+    use crate::states::ast::{ Expression, Literal, Operator, SymbolTable, Type };
     use std::collections::HashMap;
 
-    // Write a test suite for uniquify.
     #[test]
     fn test_uniquify_variable() {
         let mut var = Expression::Variable { id: Identifier { id: "foo".to_string() } };

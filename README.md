@@ -55,9 +55,4 @@ Operators are defined for one type and one type only. For example, `==` and `!=`
 ### Assignments / locals
 yup
 
-## Deadlines
-- [x] Week 2.4: First meeting
-- [ ] Week 2.7: Second meeting
-- [ ] Jan 13: Final code and report
-- [ ] Jan 15: Demo
 

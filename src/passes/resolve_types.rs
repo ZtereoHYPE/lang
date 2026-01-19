@@ -1,5 +1,6 @@
-use crate::states::ast::{Expression, Function, Program, Statement, Symbol, Type};
-use crate::states::scope::ScopeStack;
+use crate::representations::ast::{Expression, Function, Program, Statement, Symbol, Type};
+use crate::representations::scope::ScopeStack;
+use std::process::exit;
 
 struct TypeError {
     error: String
@@ -15,7 +16,8 @@ pub fn resolve_types(program: &mut Program) {
     };
 
     if let Err(e) = program.resolve_types(stack) {
-        println!("Type error detected: {}", e.error)
+        println!("Type error detected: {}", e.error);
+        exit(-1)
     }
 }
 
@@ -43,8 +45,13 @@ impl Function {
             self.symbols.insert(id.clone(), Symbol::Variable {ty: *ty});
         }
 
-        self.body.resolve_type(stack.with_scope(&self.symbols))?;
-        Ok(())
+        let ty = self.body.resolve_type(stack.with_scope(&self.symbols))?;
+
+        if ty == self.ty {
+            Ok(())
+        } else {
+            Err(TypeError::new(format!("Function '{}' returns the wrong type! Expected '{:?}' but received type '{:?}'", self.id.id, self.ty, ty)))
+        }
     }
 }
 

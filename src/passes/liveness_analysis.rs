@@ -1,6 +1,6 @@
+use crate::representations::ast::Identifier;
+use crate::representations::ir::{Assignment, Atom, Block, Expression, Function, Program, Terminal};
 use std::collections::{HashMap, HashSet, VecDeque};
-use crate::states::ast::Identifier;
-use crate::states::ir::{Assignment, Atom, Block, Expression, Function, Program, Terminal};
 
 type Graph = HashMap<String, HashSet<String>>;
 
@@ -109,7 +109,9 @@ fn terminal_liveness(terminal: &Terminal, blocks: &HashMap<String, Block>) -> Ve
                 .collect()
         }
 
-        Terminal::Return(_) => HashSet::new()
+        Terminal::Return(Atom::Variable { id }) => HashSet::from([id.clone()]),
+
+        Terminal::Return(_) => HashSet::new(),
     };
 
     VecDeque::from([live_before])
@@ -151,8 +153,8 @@ impl Block {
 
 #[cfg(test)]
 mod tests {
-    use crate::states::ast::{Literal, Operator};
     use super::*;
+    use crate::representations::ast::{Literal, Operator};
 
     fn id(name: &str) -> Identifier {
         Identifier { id: name.to_string() }
@@ -163,7 +165,7 @@ mod tests {
             name: name.to_string(),
             liveness: vec![live_before],
             assignments: vec![],
-            terminal: Terminal::Return(Expression::Atom(Atom::Value(Literal::Unit())))
+            terminal: Terminal::Return(Atom::Value(Literal::Unit()))
         }
     }
 
@@ -240,7 +242,7 @@ mod tests {
                     rhs: Atom::Variable { id: id("z") }
                 }
             )],
-            terminal: Terminal::Return(Expression::Atom(Atom::Value(Literal::Unit())))
+            terminal: Terminal::Return(Atom::Value(Literal::Unit()))
         };
 
         let liveness = block_liveness(&block, &HashMap::new());
@@ -337,7 +339,7 @@ mod tests {
 
         // return has empty live-before
         let live_ret = terminal_liveness(
-            &Terminal::Return(Expression::Atom(Atom::Value(Literal::Int(1)))),
+            &Terminal::Return(Atom::Value(Literal::Int(1))),
             &blocks
         );
         assert_eq!(live_ret.front().unwrap(), &HashSet::new());
@@ -382,13 +384,13 @@ mod tests {
             name: "b3".into(),
             liveness: vec![],
             assignments: vec![],
-            terminal: Terminal::Return(Expression::Atom(Atom::Value(Literal::Unit())))
+            terminal: Terminal::Return(Atom::Value(Literal::Unit()))
         });
         blocks.insert("b4".into(), Block {
             name: "b4".into(),
             liveness: vec![],
             assignments: vec![],
-            terminal: Terminal::Return(Expression::Atom(Atom::Value(Literal::Unit())))
+            terminal: Terminal::Return(Atom::Value(Literal::Unit()))
         });
 
         let func = Function { name: id("f"), params: vec![], entrypoint: "b1".into(), blocks };

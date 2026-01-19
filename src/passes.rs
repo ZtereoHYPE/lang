@@ -1,5 +1,4 @@
 pub mod explicate_control;
-pub mod interpret;
 pub mod liveness_analysis;
 pub mod parse;
 pub mod rco;

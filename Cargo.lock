@@ -137,7 +137,6 @@ dependencies = [
  "pest",
  "pest_derive",
  "ratatui",
- "slab_tree",
 ]
 
 [[package]]
@@ -1091,25 +1090,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56199f7ddabf13fe5074ce809e7d3f42b42ae711800501b5b16ea82ad029c39d"
 
 [[package]]
-name = "slab_tree"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9e8b45abe77b7cab703054a11973cffe164c82c5ff5e211ae5a73af5e42e39f"
-dependencies = [
- "snowflake",
-]
-
-[[package]]
 name = "smallvec"
 version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
-
-[[package]]
-name = "snowflake"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27207bb65232eda1f588cf46db2fee75c0808d557f6b3cf19a75f5d6d7c94df1"
 
 [[package]]
 name = "static_assertions"

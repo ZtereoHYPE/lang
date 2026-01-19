@@ -1,13 +1,6 @@
-use std::collections::HashMap;
-use crate::states::ast::{Expression, Function, Literal, Operator, Program, Statement};
-
-/// runtime value
-#[derive(Debug, Clone)]
-pub enum Value {
-    Int(i64),
-    Bool(bool),
-    Unit,
-}
+use crate::interpreter::Value;
+use crate::representations::ast::{Expression, Function, Literal, Operator, Program, Statement};
+use std::collections::{HashMap, HashSet};
 
 /// environment that holds variable bindings
 type Environment = HashMap<String, Value>;
@@ -15,14 +8,19 @@ type Environment = HashMap<String, Value>;
 pub type InterpretResult = Result<Value, String>;
 
 /// interprets the entire program, starting from main
-pub fn interpret(program: &Program) -> InterpretResult {
+pub fn interpret_ast(program: &Program) -> Value {
     let mut interpreter = Interpreter::new(program);
-    interpreter.run()
+    let result = interpreter.run();
+
+    if let Err(e) = result {
+        panic!("The AST interpreter failed with an error: {}", e);
+    }
+
+    result.unwrap()
 }
 
 /// interpreter struct containing the program and functions
 struct Interpreter<'a> {
-    program: &'a Program,
     functions: HashMap<String, &'a Function>,
 }
 
@@ -32,7 +30,7 @@ impl<'a> Interpreter<'a> {
         for f in &program.functions {
             functions.insert(f.id.id.clone(), f);
         }
-        Interpreter { program, functions }
+        Interpreter { functions }
     }
 
     /// run the interpreter beginning from main
@@ -69,8 +67,7 @@ impl<'a> Interpreter<'a> {
         }
 
         let f = self.functions.get(name)
-            .ok_or_else(|| format!("function '{}' not found", name))?
-            .clone();
+            .ok_or_else(|| format!("function '{}' not found", name))?;
 
         // new environment with function parameters
         let mut env = Environment::new();
@@ -82,11 +79,11 @@ impl<'a> Interpreter<'a> {
             }
         }
 
-        self.eval_expression(&f.body, &mut env)
+        self.eval_expression(&f.body, &mut env, &HashSet::new())
     }
 
-    /// evaluat expression in the environment
-    fn eval_expression(&mut self, expr: &Expression, env: &mut Environment) -> InterpretResult {
+    /// evaluate expression in the environment
+    fn eval_expression(&mut self, expr: &Expression, env: &mut Environment, outer_vars: &HashSet<String>) -> InterpretResult {
         match expr {
             Expression::Literal(lit) => self.eval_literal(lit),
 
@@ -97,31 +94,33 @@ impl<'a> Interpreter<'a> {
             }
 
             Expression::UnaryOp { op, expr } => {
-                let val = self.eval_expression(expr, env)?;
+                let val = self.eval_expression(expr, env, outer_vars)?;
                 self.eval_unary_op(op, val)
             }
 
             Expression::BinaryOp { lhs, op, rhs } => {
-                let left = self.eval_expression(lhs, env)?;
-                let right = self.eval_expression(rhs, env)?;
+                let left = self.eval_expression(lhs, env, outer_vars)?;
+                let right = self.eval_expression(rhs, env, outer_vars)?;
                 self.eval_binary_op(op, left, right)
             }
 
             Expression::FunctionCall { id, args } => {
                 let mut evaluated_args = Vec::new();
                 for arg in args {
-                    evaluated_args.push(self.eval_expression(arg, env)?);
+                    evaluated_args.push(self.eval_expression(arg, env, outer_vars)?);
                 }
                 self.call_function(&id.id, evaluated_args)
             }
 
             Expression::If { expression, then, else_expr } => {
-                let condition = self.eval_expression(expression, env)?;
+                let condition = self.eval_expression(expression, env, outer_vars)?;
                 match condition {
-                    Value::Bool(true) => self.eval_expression(then, env),
+                    Value::Bool(true) => {
+                        self.eval_expression_propagate(then, env, outer_vars)
+                    },
                     Value::Bool(false) => {
                         if let Some(else_branch) = else_expr {
-                            self.eval_expression(else_branch, env)
+                            self.eval_expression_propagate(else_branch, env, outer_vars)
                         } else {
                             Ok(Value::Unit)
                         }
@@ -132,10 +131,10 @@ impl<'a> Interpreter<'a> {
 
             Expression::While { expression, block } => {
                 loop {
-                    let condition = self.eval_expression(expression, env)?;
+                    let condition = self.eval_expression(expression, env, outer_vars)?;
                     match condition {
                         Value::Bool(true) => {
-                            self.eval_expression(block, env)?;
+                            self.eval_expression_propagate(block, env, outer_vars)?;
                         }
                         Value::Bool(false) => break,
                         _ => return Err("while condition must be bool".to_string()),
@@ -145,33 +144,51 @@ impl<'a> Interpreter<'a> {
             }
 
             Expression::Block { symbols: _, statements, expression } => {
-                // create a new scope(cloned)
+                // create a new scope with all current variables as outer
                 let mut block_env = env.clone();
-
+                let block_outer: HashSet<String> = env.keys().cloned().collect();
                 for stmt in statements {
-                    self.eval_statement(stmt, &mut block_env)?;
+                    self.eval_statement(stmt, &mut block_env, &block_outer)?;
                 }
-
-                // return final expression
-                if let Some(expr) = expression {
-                    self.eval_expression(expr, &mut block_env)
+                let result = if let Some(expr) = expression {
+                    self.eval_expression(expr, &mut block_env, &block_outer)
                 } else {
                     Ok(Value::Unit)
+                };
+                for var in outer_vars {
+                    if let Some(val) = block_env.get(var) {
+                        env.insert(var.clone(), val.clone());
+                    }
                 }
+                result
             }
         }
     }
 
-    fn eval_statement(&mut self, stmt: &Statement, env: &mut Environment) -> InterpretResult {
+    /// evaluate an expression and propagate changes to outer variables back to env, this is used for "while and if" where we want changes to remain
+    fn eval_expression_propagate(&mut self, expr: &Expression, env: &mut Environment, outer_vars: &HashSet<String>) -> InterpretResult {
+        let full_outer: HashSet<String> = env.keys().cloned().chain(outer_vars.iter().cloned()).collect();
+        let mut block_env = env.clone();
+        let result = self.eval_expression(expr, &mut block_env, &full_outer)?;
+        for var in &full_outer {
+            if let Some(val) = block_env.get(var) {
+                env.insert(var.clone(), val.clone());
+            }
+        }
+        
+        Ok(result)
+    }
+
+    fn eval_statement(&mut self, stmt: &Statement, env: &mut Environment, outer_vars: &HashSet<String>) -> InterpretResult {
         match stmt {
             Statement::Declaration { id, ty: _, expression } => {
-                let val = self.eval_expression(expression, env)?;
+                let val = self.eval_expression(expression, env, outer_vars)?;
                 env.insert(id.id.clone(), val);
                 Ok(Value::Unit)
             }
 
             Statement::Assignment { id, expression } => {
-                let val = self.eval_expression(expression, env)?;
+                let val = self.eval_expression(expression, env, outer_vars)?;
                 if env.contains_key(&id.id) {
                     env.insert(id.id.clone(), val);
                     Ok(Value::Unit)
@@ -181,7 +198,7 @@ impl<'a> Interpreter<'a> {
             }
 
             Statement::Expression(expr) => {
-                self.eval_expression(expr, env)?;
+                self.eval_expression_propagate(expr, env, outer_vars)?;
                 Ok(Value::Unit)
             }
         }
@@ -238,88 +255,5 @@ impl<'a> Interpreter<'a> {
             Value::Bool(b) => b.to_string(),
             Value::Unit => "()".to_string(),
         }
-    }
-}
-
-pub fn interpret_to_string(program: &Program) -> String {
-    match interpret(program) {
-        Ok(val) => match val {
-            Value::Int(n) => format!("result: {}", n),
-            Value::Bool(b) => format!("result: {}", b),
-            Value::Unit => "result: ()".to_string(),
-        },
-        Err(e) => format!("error: {}", e),
-    }
-}
-
-/// interpreter for TUI display
-#[derive(Debug, Clone)]
-pub struct StepInterpreter<'a> {
-    program: &'a Program,
-    functions: HashMap<String, &'a Function>,
-    call_stack: Vec<CallFrame>,
-    current_env: Environment,
-    step_count: usize,
-    finished: bool,
-    result: Option<Value>,
-}
-
-#[derive(Debug, Clone)]
-pub struct CallFrame {
-    pub function_name: String,
-    pub env: Environment,
-}
-
-#[derive(Debug, Clone)]
-pub struct StepResult {
-    pub step: usize,
-    pub description: String,
-    pub current_function: String,
-    pub environment: HashMap<String, String>,
-    pub finished: bool,
-    pub result: Option<String>,
-}
-
-impl<'a> StepInterpreter<'a> {
-    pub fn new(program: &'a Program) -> Self {
-        let mut functions = HashMap::new();
-        for f in &program.functions {
-            functions.insert(f.id.id.clone(), f);
-        }
-        
-        StepInterpreter {
-            program,
-            functions,
-            call_stack: vec![],
-            current_env: Environment::new(),
-            step_count: 0,
-            finished: false,
-            result: None,
-        }
-    }
-
-    /// current state for display
-    pub fn get_state(&self) -> StepResult {
-        let current_function = self.call_stack.last()
-            .map(|f| f.function_name.clone())
-            .unwrap_or_else(|| "none".to_string());
-
-        let environment: HashMap<String, String> = self.current_env
-            .iter()
-            .map(|(k, v)| (k.clone(), format!("{:?}", v)))
-            .collect();
-
-        StepResult {
-            step: self.step_count,
-            description: format!("step {}", self.step_count),
-            current_function,
-            environment,
-            finished: self.finished,
-            result: self.result.as_ref().map(|v| format!("{:?}", v)),
-        }
-    }
-
-    pub fn is_finished(&self) -> bool {
-        self.finished
     }
 }

@@ -1,4 +1,4 @@
-use crate::states::ast::{Expression, Function, Identifier, Literal, Operator, Program, Statement, Type};
+use crate::representations::ast::{Expression, Function, Identifier, Literal, Operator, Program, Statement, Type};
 use itertools::Itertools;
 use pest::error::{ErrorVariant, LineColLocation};
 use pest::iterators::{Pair, Pairs};
@@ -36,7 +36,7 @@ impl AstParseError {
         Self { error: String::from(error) }
     }
     pub fn new(error: String) -> Self {
-        Self { error: error }
+        Self { error }
     }
 }
 
@@ -63,9 +63,8 @@ pub fn parse_file(input_file: String) -> Program {
 
     let result = Program::from_pair(pairs.unwrap().next().unwrap());
 
-    // todo: improve these compiler errors
     if let Err(e) = result {
-        println!("Failed to parse! Error: {:?}", e);
+        println!("Failed to parse AST! Error: {:?}", e.error);
         exit(-1)
     }
 

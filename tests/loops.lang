@@ -1,0 +1,52 @@
+fn simpleLoopSum(n: Int): Int = {
+    let acc: Int = 0;
+
+    let i: Int = 0;
+
+    while i < n {
+        acc = acc + i;
+        i = i + 1;
+    };
+
+    acc
+}
+
+fn nestedLoopProductSum(): Int = {
+    let outer: Int = 2;
+    let total: Int = 0;
+
+    while outer > 0 {
+        let inner: Int = 0;
+        while inner < 3 {
+            total = total + outer * inner;
+            inner = inner + 1;
+        };
+        
+        outer = outer - 1;
+    };
+
+    total
+}
+
+fn guardedWhileIncrement(): Int = {
+    let value: Int = 0;
+
+    let keepGoing: Bool = true;
+
+    while keepGoing {
+        value = value + 5;
+        if value > 12 {
+            keepGoing = false;
+        };
+    };
+
+    value
+}
+
+fn main(): Int = {
+    let simpleResult: Int = simpleLoopSum(5);
+    let nestedResult: Int = nestedLoopProductSum();
+    let guardedResult: Int = guardedWhileIncrement();
+
+    simpleResult + nestedResult + guardedResult
+}

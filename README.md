@@ -1,13 +1,5 @@
 # Lang lang compiler
 
-## General architecture overview:
-The course and the assignment mostly focus on the _lowering_ stage of a compiler. That is, the stage where you slowly bring the parsed tree closer to the resulting x86 (or LLVM IR, if we want cool optimisations and compilation targets).
-
-However, in order to build a fully-working compiler, one must perform additional steps before starting the lowering process. Generally, these break down into:
-![Frontend Architecture](resources/Compiler.png)
-
-The semantic analysis does not create an additional intermediate representation, but is fully based on the information already present on the initial AST. Once the analysis validated the tree, because operators only have one "overload", it is already possible to know what the types of the various expressions are.
-
 ## Language design
 The language design borrows (pun intended) a lot from Rust, and a bit from Scala. It was designed to have a very very simple grammar whilst keeping nice features such as expression blocks and if statements.
 

@@ -1,7 +1,6 @@
-use crate::states::ast::{Identifier, Literal};
-use crate::states::ir::{Assignment, Atom, Terminal};
-use crate::states::{ast, ir};
-use std::clone;
+use crate::representations::ast::{Identifier, Literal};
+use crate::representations::ir::{Assignment, Terminal};
+use crate::representations::{ast, ir};
 use std::collections::HashMap;
 
 pub fn explicate_control(program: ast::Program) -> ir::Program {
@@ -51,7 +50,7 @@ impl ExplicateControl {
         }
     }
 
-    const RETURN_UNIT: Tail = Tail::Term(ir::Terminal::Return(ir::Expression::Atom(ir::Atom::Value(Literal::Unit()))));
+    const RETURN_UNIT: Tail = Tail::Term(ir::Terminal::Return(ir::Atom::Value(Literal::Unit())));
 
     fn explicate_tail(&mut self, expr: ast::Expression) -> Tail {
         match expr {
@@ -87,29 +86,35 @@ impl ExplicateControl {
             }
 
             ast::Expression::While { expression, block } => {
-                let condition_label = self.block_label();
+                let header_label = self.block_label();
+                let condition_id = self.tmp_id();
 
-                let then_label = {
+                let body_label = {
                     let tmp_id = self.tmp_id();
-                    let tail = self.explicate_assignment(*block, tmp_id, Tail::Term(Terminal::Goto {label: condition_label.clone()}));
+                    let tail = self.explicate_assignment(*block, tmp_id, Tail::Term(Terminal::Goto {label: header_label.clone()}));
                     self.create_block(tail)
                 };
 
                 let else_label = self.create_block(Self::RETURN_UNIT);
 
-                self.create_named_block(
-                    Tail::Term(Terminal::Conditional {
-                        condition: atom_of(*expression),
-                        then_label,
-                        else_label
-                    }),
-                    condition_label.clone()
-                );
+                let header = self.explicate_assignment(*expression, condition_id.clone(), Tail::Term(Terminal::Conditional {
+                    condition: ir::Atom::Variable { id: condition_id },
+                    then_label: body_label,
+                    else_label
+                }));
+                self.create_named_block(header, header_label.clone());
 
-                Tail::Term(Terminal::Goto {label: condition_label})
+                Tail::Term(Terminal::Goto { 
+                    label: header_label 
+                })
             }
 
-            e => Tail::Term(Terminal::Return(expr_of(e)))
+            ast::Expression::Variable { .. } | ast::Expression::Literal(_) => Tail::Term(Terminal::Return(atom_of(expr))),
+            
+            e => {
+                let tmp_id = self.tmp_id();
+                self.explicate_assignment(e, tmp_id.clone(), Tail::Term(Terminal::Return(ir::Atom::Variable { id: tmp_id })))
+            }
         }
     }
 
@@ -118,6 +123,7 @@ impl ExplicateControl {
             ast::Expression::Block { statements, expression, .. } => {
                 statements
                     .into_iter()
+                    .rev()
                     .fold(
                         self.explicate_assignment(*expression.unwrap(), id, cont),
                         |t, s| self.explicate_statement(s, t)
@@ -147,11 +153,11 @@ impl ExplicateControl {
             }
 
             ast::Expression::While { expression, block } => {
-                let condition_label = self.block_label();
+                let header_label = self.block_label();
+                let condition_id = self.tmp_id();
 
-                let then_label = {
-                    let tmp_id = self.tmp_id();
-                    let tail = self.explicate_assignment(*block, tmp_id, Tail::Term(Terminal::Goto {label: condition_label.clone()}));
+                let body_label = {
+                    let tail = self.explicate_assignment(*block, id.clone(), Tail::Term(Terminal::Goto {label: header_label.clone()}));
                     self.create_block(tail)
                 };
 
@@ -160,18 +166,19 @@ impl ExplicateControl {
                     self.create_block(tail)
                 };
 
-                self.create_named_block(
-                    Tail::Term(Terminal::Conditional {
-                        condition: atom_of(*expression),
-                        then_label,
-                        else_label
-                    }),
-                    condition_label.clone()
-                );
+                let header = self.explicate_assignment(*expression, condition_id.clone(), Tail::Term(Terminal::Conditional {
+                    condition: ir::Atom::Variable { id: condition_id },
+                    then_label: body_label,
+                    else_label
+                }));
+                self.create_named_block(header, header_label.clone());
 
-                Tail::Term(Terminal::Goto {label: condition_label})
-
+                Tail::Term(Terminal::Goto {
+                    label: header_label
+                })
             }
+
+            ast::Expression::Literal(Literal::Unit()) => cont, // optimisation: Skip () assignments (they do nothing)
 
             e => Tail::Assign((id, expr_of(e)), Box::new(cont))
         }
@@ -190,6 +197,7 @@ impl ExplicateControl {
             }
         }
     }
+    
 
     fn create_block(&mut self, block: Tail) -> String {
         if let Tail::Term(ir::Terminal::Goto{ label }) = block {
@@ -277,7 +285,7 @@ fn atom_of(atom: ast::Expression) -> ir::Atom {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::states::ast::{
+    use crate::representations::ast::{
         Expression, Function as AstFunction, Literal, Operator, Program as AstProgram, SymbolTable,
         Type,
     };
@@ -378,9 +386,9 @@ mod tests {
                     b_id.clone(),
                     expr_of(Expression::Variable { id: a_id.clone() }),
                 ),
-                Box::new(Tail::Term(ir::Terminal::Return(ir::Expression::Atom(
+                Box::new(Tail::Term(ir::Terminal::Return(
                     ir::Atom::Variable { id: b_id.clone() },
-                )))),
+                ))),
             )),
         );
 
@@ -390,7 +398,7 @@ mod tests {
         assert_eq!(assignments[1].0.id, "b");
 
         match terminal {
-            ir::Terminal::Return(ir::Expression::Atom(ir::Atom::Variable { id })) => {
+            ir::Terminal::Return(ir::Atom::Variable { id }) => {
                 assert_eq!(id.id, "b")
             }
             _ => panic!("expected return of variable b"),
@@ -432,20 +440,26 @@ mod tests {
         assert_eq!(f.blocks.len(), 1);
 
         let block = f.blocks.get(&f.entrypoint).expect("entry block exists");
-        assert_eq!(block.assignments.len(), 1);
+        assert_eq!(block.assignments.len(), 2);
         assert_eq!(block.assignments[0].0.id, "x");
         assert!(matches!(
             block.assignments[0].1,
             ir::Expression::Atom(ir::Atom::Value(Literal::Int(10)))
         ));
+        assert!(matches!(
+            block.assignments[1],
+            (ref ass_id, ir::Expression::Binary {
+                lhs: ir::Atom::Variable { ref id },
+                op: Operator::Minus,
+                rhs: ir::Atom::Value(Literal::Int(5))
+            }) if ass_id.id.starts_with("_") && id.id == "x"
+        ));
 
         match &block.terminal {
-            ir::Terminal::Return(ir::Expression::Binary { lhs, op, rhs }) => {
-                assert!(matches!(lhs, ir::Atom::Variable { id } if id.id == "x"));
-                assert!(matches!(op, Operator::Minus));
-                assert!(matches!(rhs, ir::Atom::Value(Literal::Int(5))));
+            ir::Terminal::Return(ir::Atom::Variable { id }) => {
+                assert!(id.id.starts_with("_"))
             }
-            _ => panic!("expected return of binary expression"),
+            _ => panic!("expected return of temp variable"),
         }
     }
 
@@ -484,19 +498,25 @@ mod tests {
 
         assert!(then_block.assignments.is_empty());
         match then_block.terminal {
-            ir::Terminal::Return(ir::Expression::Atom(ir::Atom::Value(Literal::Int(v)))) => {
+            ir::Terminal::Return(ir::Atom::Value(Literal::Int(v))) => {
                 assert_eq!(v, 1)
             }
             _ => panic!("expected return 1"),
         }
 
-        assert!(else_block.assignments.is_empty());
-        match &else_block.terminal {
-            ir::Terminal::Return(ir::Expression::Unary { op, atom }) => {
-                assert!(matches!(op, Operator::Negated));
-                assert!(matches!(atom, ir::Atom::Value(Literal::Int(1))));
+        assert_eq!(else_block.assignments.len(), 1);
+        assert!(matches!(
+            else_block.assignments[0].1,
+            ir::Expression::Unary {
+                op: Operator::Negated,
+                atom: ir::Atom::Value(Literal::Int(1))
             }
-            _ => panic!("expected return -1 as unary negation"),
+        ));
+        match &else_block.terminal {
+            ir::Terminal::Return(ir::Atom::Variable { id }) => {
+                assert!(id.id.starts_with("_"))
+            }
+            _ => panic!("expected return temp variable"),
         }
 
         match &cond_block.terminal {
@@ -556,6 +576,7 @@ mod tests {
             symbols: HashMap::new(),
             functions: vec![func],
         };
+
         let ir = explicate_control(program);
         let f = &ir.functions[0];
 
@@ -563,7 +584,7 @@ mod tests {
         assert_eq!(f.entrypoint, "block_4");
 
         let after_block = f.blocks.get("block_1").unwrap();
-        assert_eq!(after_block.assignments.len(), 1);
+        assert_eq!(after_block.assignments.len(), 2);
         assert!(matches!(
             after_block.assignments[0].1,
             ir::Expression::Binary {
@@ -573,13 +594,16 @@ mod tests {
             } if id.id == "x"
         ));
         assert!(matches!(
-            after_block.terminal,
-            ir::Terminal::Return(ir::Expression::Binary {
+            after_block.assignments[1],
+            (ref ass_id, ir::Expression::Binary {
                 lhs: ir::Atom::Variable { ref id },
                 op: Operator::Plus,
                 rhs: ir::Atom::Value(Literal::Int(2))
-            }) if id.id == "x"
+            }) if ass_id.id.starts_with("_") && id.id == "x"
         ));
+        assert!(
+            matches!(after_block.terminal, ir::Terminal::Return(ir::Atom::Variable { ref id }) if id.id.starts_with("_"))
+        );
 
         let then_block = f.blocks.get("block_2").unwrap();
         assert_eq!(then_block.assignments.len(), 1);
@@ -686,7 +710,7 @@ mod tests {
         let helper_block = helper_ir.blocks.get(&helper_ir.entrypoint).unwrap();
         assert!(helper_block.assignments.is_empty());
         assert!(
-            matches!(helper_block.terminal, ir::Terminal::Return(ir::Expression::Atom(ir::Atom::Variable { ref id })) if id.id == "a")
+            matches!(helper_block.terminal, ir::Terminal::Return(ir::Atom::Variable { ref id }) if id.id == "a")
         );
 
         let main_ir = ir
@@ -719,13 +743,24 @@ mod tests {
         ));
 
         let header = main_ir.blocks.get(&header_label).unwrap();
-        let (body_label, if_cond_label) = match &header.terminal {
+        assert_eq!(header.assignments.len(), 1);
+        let (cond_tmp, cond_expr) = &header.assignments[0];
+        assert!(cond_tmp.id.starts_with("_"));
+        assert!(matches!(
+            cond_expr,
+            ir::Expression::Atom(ir::Atom::Value(Literal::Bool(false)))
+        ));
+
+        let (body_label, after_label) = match &header.terminal {
             ir::Terminal::Conditional {
                 condition,
                 then_label,
                 else_label,
             } => {
-                assert!(matches!(condition, ir::Atom::Value(Literal::Bool(false))));
+                assert!(matches!(
+                    condition,
+                    ir::Atom::Variable { id } if id.id == cond_tmp.id
+                ));
                 (then_label.clone(), else_label.clone())
             }
             _ => panic!("while header should be conditional"),
@@ -733,7 +768,7 @@ mod tests {
 
         let body = main_ir.blocks.get(&body_label).unwrap();
 
-        assert_eq!(body.assignments.len(), 2);
+        assert_eq!(body.assignments.len(), 1);
         assert!(matches!(
             body.assignments[0],
             (ref id_ass, ir::Expression::Binary {
@@ -743,17 +778,12 @@ mod tests {
             }) if id_ass.id == "x" && id.id == "x"
         ));
 
-        assert!(matches!(
-            body.assignments[1],
-            (ref id_ass, ir::Expression::Atom(Atom::Value(Literal::Unit()))) if id_ass.id.starts_with("_")
-        ));
-
         assert!(
             matches!(body.terminal, ir::Terminal::Goto { ref label } if label == &header_label)
         );
 
-        let if_cond = main_ir.blocks.get(&if_cond_label).unwrap();
-        let (return_then_label, return_else_label) = match &if_cond.terminal {
+        let after = main_ir.blocks.get(&after_label).unwrap();
+        let (return_then_label, return_else_label) = match &after.terminal {
             ir::Terminal::Conditional {
                 condition,
                 then_label,
@@ -767,16 +797,21 @@ mod tests {
 
         let return_then = main_ir.blocks.get(&return_then_label).unwrap();
         assert!(
-            matches!(return_then.terminal, ir::Terminal::Return(ir::Expression::Atom(ir::Atom::Variable { ref id })) if id.id == "x")
+            matches!(return_then.terminal, ir::Terminal::Return(ir::Atom::Variable { ref id }) if id.id.starts_with("x"))
         );
 
         let return_else = main_ir.blocks.get(&return_else_label).unwrap();
+        assert_eq!(return_else.assignments.len(), 1);
         assert!(
-            matches!(return_else.terminal, ir::Terminal::Return(ir::Expression::Binary {
-            lhs: ir::Atom::Value(Literal::Int(0)),
-            op: Operator::Minus,
-            rhs: ir::Atom::Variable { ref id }
-        }) if id.id == "x")
+            matches!(return_else.assignments[0],
+                (ref ass_id, ir::Expression::Binary {
+                    lhs: ir::Atom::Value(Literal::Int(0)),
+                    op: Operator::Minus,
+                    rhs: ir::Atom::Variable { ref id }
+                }) if ass_id.id.starts_with("_") && id.id == "x")
+        );
+        assert!(
+            matches!(return_else.terminal, ir::Terminal::Return(ir::Atom::Variable { ref id }) if id.id.starts_with("_"))
         );
     }
 }

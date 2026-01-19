@@ -1,5 +1,4 @@
-use crate::states::ast::{Identifier, Symbol, SymbolTable};
-use itertools::Itertools;
+use crate::representations::ast::{Identifier, Symbol, SymbolTable};
 
 #[derive(Clone)]
 pub struct ScopeStack<'a> {

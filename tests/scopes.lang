@@ -1,0 +1,21 @@
+fn main(): Int = {
+    let scopedValue: Bool = {
+        let scopedValue: Int = 3;
+        let otherScopedValue: Int = 4;
+        scopedValue != otherScopedValue
+    };
+
+    if scopedValue {
+        {
+            {
+                {
+                    {
+                        3
+                    }
+                }
+            }
+        }
+    } else {
+        4
+    }
+}

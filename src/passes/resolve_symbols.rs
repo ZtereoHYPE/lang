@@ -1,5 +1,5 @@
-use crate::states::ast::{Expression, Function, Program, Statement, Symbol};
-use crate::states::scope::ScopeStack;
+use crate::representations::ast::{Expression, Function, Program, Statement, Symbol};
+use crate::representations::scope::ScopeStack;
 use std::process::exit;
 
 struct SymbolError {
@@ -17,7 +17,7 @@ pub fn resolve_symbols(program: &mut Program) {
 
     if let Err(e) = program.populate_symbols(stack) {
         println!("Failed resolving symbols: {}", e.error);
-        exit(-1); // todo: find a better solution than exiting here. Maybe propagate the error upwards?
+        exit(-1);
     }
 }
 

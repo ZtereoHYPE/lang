@@ -1,5 +1,5 @@
+use crate::representations::ast::{Identifier, Literal, Operator};
 use std::collections::{HashMap, HashSet};
-use crate::states::ast::{Identifier, Literal, Operator};
 
 pub type Assignment = (Identifier, Expression);
 
@@ -36,7 +36,7 @@ pub enum Terminal {
         else_label: String
     },
 
-    Return(Expression)
+    Return(Atom)
 }
 
 #[derive(Clone, Debug)]

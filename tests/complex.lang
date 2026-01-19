@@ -1,0 +1,51 @@
+fn funnyName(x: Int): Int = x + 13 + 12
+
+fn tester(): Int = {
+    let x: Bool = false & true;
+
+    let y: Int = if x {
+        let x: Int = 10;
+        x
+    } else {
+        -10
+    };
+
+    while 10 < 3 {
+        // comment test
+        1;
+    };
+
+    -funnyName(y)
+}
+
+fn factorial(n: Int): Int =
+    (if n == 1 { 1 } else { n * factorial(n - 1) })
+    
+fn loopy(): Int = {
+    let counter: Int = 10;
+    let sum: Int = 0;
+    while counter > 0 {
+        sum = sum + 2;
+        counter = counter - 1;
+    };
+    
+    sum
+}
+
+fn main(): Int = {
+    let variable: Int = 123 + -3 * 4 / {3 + 4};
+
+    let myThing: Int = {
+        let hello: Unit = {};
+
+        funnyName(factorial(8));
+
+        let x: Int = 12;
+
+        variable + 13
+    };
+
+    tester();
+
+    loopy()
+}

@@ -1,4 +1,4 @@
-use crate::states::ast::{Expression, Literal, Program, Operator, Statement};
+use crate::representations::ast::{Expression, Literal, Operator, Program, Statement};
 
 // Shrinks a program by removing expressions not available in x86
 pub fn shrink_program(program: &mut Program) {
@@ -130,11 +130,10 @@ fn shrink_statement(s: Statement) -> Statement { match s {
         Statement::Declaration { id, ty, expression: shrink_expr(expression) }
 }}
 
-
 #[cfg(test)]
 mod tests {
-    use crate::states::ast::Identifier;
-    use crate::states::ast::Type;
+    use crate::representations::ast::Identifier;
+    use crate::representations::ast::Type;
     use super::*;
 
     #[test]

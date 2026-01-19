@@ -1,14 +1,17 @@
-use std::fmt;
-use std::fmt::Formatter;
-use ratatui::prelude::*;
+use crate::interpreter::ir_interpreter::CallFrame;
+use crate::representations::ast::{Literal, Operator};
+use crate::representations::ir;
+use crate::representations::ir::{Atom, Expression};
+use crate::tui::{BACKGROUND, BLOCK, BORDER_STYLE};
+use itertools::Itertools;
 use ratatui::prelude::Stylize;
+use ratatui::prelude::*;
 use ratatui::style::palette::tailwind::SLATE;
 use ratatui::style::Styled;
-use ratatui::widgets::{Block, BorderType, Borders, HighlightSpacing, List, ListState, Padding};
-use crate::states::ast::{Literal, Operator};
-use crate::states::ir;
-use crate::states::ir::{Atom, Expression};
-use crate::tui::{BACKGROUND, BLOCK, BORDER_STYLE};
+use ratatui::widgets::{HighlightSpacing, List, ListState};
+use std::cmp::Ordering;
+use std::fmt;
+use std::fmt::Formatter;
 
 
 const LABEL_STYLE: Style = Style::new()
@@ -24,7 +27,8 @@ const TERMINAL_STYLE: Style = Style::new()
 pub struct IrPanel {
     pub ir: ir::Program,
     pub function: String,
-    pub line_nr: usize
+    pub block: String,
+    pub statement: usize,
 }
 
 impl Widget for IrPanel {
@@ -35,9 +39,12 @@ impl Widget for IrPanel {
             .expect("fn dont exist??");
 
         let title = Line::from(vec![
-            "IR View - ".white(),
-            "fn ".bold().white(),
-            function.name.id.clone().blue().bold()
+            "Function ".white(),
+            self.function.blue().bold(),
+            " - Block ".white(),
+            self.block.clone().blue().bold(),
+            " - Statement ".white(),
+            self.statement.blue().bold()
         ]).centered();
 
         let block = BLOCK
@@ -45,7 +52,9 @@ impl Widget for IrPanel {
             .bg(BACKGROUND)
             .border_style(BORDER_STYLE);
 
-        let list = List::new(get_function_lines(function))
+        let (fn_lines, line_nr) = get_function_lines(function, self.block, self.statement);
+
+        let list = List::new(fn_lines)
             .block(block)
             .highlight_style(Style::new().bg(SLATE.c700).add_modifier(Modifier::BOLD))
             .highlight_symbol(">> ")
@@ -53,33 +62,58 @@ impl Widget for IrPanel {
             .scroll_padding(2000);
 
         let mut state = ListState::default();
-        state.select(Some(self.line_nr));
+        state.select(Some(line_nr));
 
         StatefulWidget::render(list, area, buf, &mut state);
     }
 }
 
 impl IrPanel {
-    pub(crate) fn new(ir: ir::Program, function: String, line_nr: usize) -> Self {
-        Self { ir, function, line_nr }
+    pub(crate) fn new(ir: ir::Program, state: &CallFrame) -> Self {
+        let function = state.ip.function.name.id.clone();
+        let block = state.ip.block.name.clone();
+        let statement = state.ip.statement;
+
+        Self { ir, function, block, statement }
     }
 }
 
-fn get_function_lines(function: ir::Function) -> Vec<Line<'static>> {
+fn get_function_lines(function: ir::Function, block_name: String, statement: usize) -> (Vec<Line<'static>>, usize) {
     let mut lines = Vec::new();
+    let mut line_nr = 0;
 
-    for (name, block) in function.blocks {
+    let sorted_blocks = function.blocks
+        .into_iter()
+        .sorted_by(|(l, _), (r, _)| block_comparator(l, r));
+
+    for (name, block) in sorted_blocks {
+        if name == block_name {
+            line_nr = lines.len() + statement + 1; // 1 for the header
+        }
+
         lines.push(Line::from(name + ":").style(LABEL_STYLE));
-        for (id, exp) in block.assignments {
+        for (id, exp) in &block.assignments {
             lines.push(
                 Line::from(format!("    {} = {}", id.id, exp.to_string())).style(ASS_STYLE)
             )
         }
+
         lines.push(block.terminal.get_line());
         lines.push(Line::from(""));
     }
 
-    lines
+    (lines, line_nr)
+}
+
+fn block_comparator(left: &String, right: &String) -> Ordering {
+    let left_int = left[6..].parse::<usize>();
+    let right_int = right[6..].parse::<usize>();
+
+    if let (Ok(l), Ok(r)) = (left_int, right_int) {
+        Ord::cmp(&r, &l)
+    } else {
+        Ord::cmp(left, right)
+    }
 }
 
 impl ir::Terminal {
@@ -112,7 +146,7 @@ impl fmt::Display for ir::Expression {
         match self {
             Expression::Unary { op, atom }      => write!(f, "{}{}", op.to_string(), atom.to_string()),
             Expression::Binary { lhs, op, rhs } => write!(f, "{} {} {}", lhs.to_string(), op.to_string(), rhs.to_string()),
-            Expression::FunCall { id, args }    => write!(f, "{}({})", id.id, args.iter().map(|a| a.to_string()).fold(String::new(), |s, a| s + ", " + &a)), // folds are my best friend
+            Expression::FunCall { id, args }    => write!(f, "{}({})", id.id, args.iter().map(|a| a.to_string()).fold(String::new(), |s, a| if s.len() > 0 {s + ", " + &a} else {a})), // folds are my best friend
             Expression::Atom(a)                 => write!(f, "{}", a.to_string())
         }
     }

@@ -1,5 +1,5 @@
+use crate::representations::ast::{Expression, Identifier, Program, Statement};
 use std::collections::HashMap;
-use crate::states::ast::{Expression, Program, Statement, Identifier};
 
 // warning: symbol table is bad after this. oh, well.
 pub fn uniquify_program(ast: &mut Program) {
@@ -54,6 +54,8 @@ impl Uniquify {
             Expression::Variable { id } => {
                 if names.contains_key(&id) {
                     *id = names[&id].clone();
+                } else {
+                    println!("Warning: variable {:?} not found in names during uniquification", id);
                 }
             }
             
@@ -65,12 +67,20 @@ impl Uniquify {
             Expression::Block { statements, expression, .. } => {
                 for s in statements {
                     match s {
-                        Statement::Declaration { id, expression, .. } |
-                        Statement::Assignment { id, expression } => {
-                            let new_id = self.gensym(&id);
+                        Statement::Declaration { id, expression, .. } => {
+                            let new_id = self.gensym(id);
                             self.uniquify_expression(expression, names.clone());
                             names.insert(id.clone(), new_id.clone());
                             *id = new_id;
+                        }
+
+                        Statement::Assignment { id, expression } => {
+                            self.uniquify_expression(expression, names.clone());
+                            if names.contains_key(&id) {
+                                *id = names[&id].clone();
+                            } else {
+                                println!("Warning: variable {:?} not found in names during uniquification", id);
+                            }
                         }
                         
                         Statement::Expression(e) => {
@@ -99,7 +109,7 @@ impl Uniquify {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::states::ast::{ Expression, Literal, Operator, SymbolTable, Type };
+    use crate::representations::ast::{Expression, Literal, Operator, SymbolTable, Type };
     use std::collections::HashMap;
 
     #[test]
@@ -107,24 +117,24 @@ mod tests {
         let mut var = Expression::Variable { id: Identifier { id: "foo".to_string() } };
         let mut names = HashMap::new();
         names.insert(Identifier { id: "foo".to_string() }, Identifier { id: "foo_0".to_string() });
-            
+
         let mut uniquify = Uniquify { names: HashMap::new() };
         uniquify.uniquify_expression(&mut var, names);
-            
+
         if let Expression::Variable { id } = var {
             assert_eq!(id.id, "foo_0");
         }
     }
 
-        #[test]
+    #[test]
     fn test_gensym() {
         let mut uniquify = Uniquify { names: HashMap::new() };
         let id = Identifier { id: "x".to_string() };
-            
+
         let sym1 = uniquify.gensym(&id);
         let sym2 = uniquify.gensym(&id);
         let sym3 = uniquify.gensym(&id);
-            
+
         assert_eq!(sym1.id, "x_0");
         assert_eq!(sym2.id, "x_1");
         assert_eq!(sym3.id, "x_2");
@@ -137,11 +147,11 @@ mod tests {
             rhs: Box::new(Expression::Variable { id: Identifier { id: "b".to_string() } }),
             op: Operator::And,
         };
-            
+
         let mut names = HashMap::new();
         names.insert(Identifier { id: "a".to_string() }, Identifier { id: "a_0".to_string() });
         names.insert(Identifier { id: "b".to_string() }, Identifier { id: "b_0".to_string() });
-        
+
         let mut uniquify = Uniquify { names: HashMap::new() };
         uniquify.uniquify_expression(&mut expr, names);
     }
@@ -157,18 +167,18 @@ mod tests {
             expression: Some(Box::new(Expression::Variable { id: Identifier { id: "x".to_string() } })),
             symbols: SymbolTable::new(),
         };
-            
+
         let mut uniquify = Uniquify { names: HashMap::new() };
         uniquify.uniquify_expression(&mut expr, HashMap::new());
 
-        
+
         if let Expression::Block { statements, expression, .. } = expr {
             assert_eq!(statements.len(), 1);
-            
+
             if let Statement::Declaration { id, .. } = &statements[0] {
                 assert_eq!(id.id, "x_0");
             }
-            
+
             if let Some(expr) = expression {
                 if let Expression::Variable { id } = *expr {
                     assert_eq!(id.id, "x_0");
@@ -195,10 +205,10 @@ mod tests {
             expression: None,
             symbols: SymbolTable::new(),
         };
-        
+
         let mut uniquify = Uniquify { names: HashMap::new() };
         uniquify.uniquify_expression(&mut expr, HashMap::new());
-        
+
         if let Expression::Block { statements, .. } = expr {
             assert_eq!(statements.len(), 2);
             if let Statement::Declaration { id: id1, .. } = &statements[0] {
@@ -310,7 +320,7 @@ mod tests {
                         assert_eq!(id2.id, "y_0");
                     }
                     if let Statement::Assignment { id: id3, .. } = &inner_stmts[3] {
-                        assert_eq!(id3.id, "x_1");
+                        assert_eq!(id3.id, "x_0");
                     }
                     if let Statement::Declaration { id: id4, .. } = &inner_stmts[4] {
                         assert_eq!(id4.id, "z_0");
